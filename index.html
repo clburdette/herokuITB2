@@ -1,0 +1,34 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>In The Blood</title>
+    <!-- update the version number as needed -->
+    <script defer src="/__/firebase/7.20.0/firebase-app.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script defer src="/__/firebase/7.20.0/firebase-auth.js"></script>
+    <script defer src="/__/firebase/7.20.0/firebase-database.js"></script>
+    <script defer src="/__/firebase/7.20.0/firebase-messaging.js"></script>
+    <script defer src="/__/firebase/7.20.0/firebase-storage.js"></script>
+    <!-- initialize the SDK after all desired features are loaded -->
+    <script defer src="/__/firebase/init.js"></script>
+    <script type="text/javascript" src="classes.js"></script>
+    <script type="text/javascript" src="controller.js"></script>
+    <script type="text/javascript" src="gameLoop.js"></script>
+    <script type="text/javascript" src="playArea.js"></script>
+    <script type="text/javascript" src="view.js"></script>
+  </head>
+  <body>
+    <div id="parent" style="position:relative;">
+    </div>
+    <div id="message">Testing2...
+    </div>
+    <div id="loginArea">
+      Email: <input id="email" type="text" value="clburdette@yahoo.com" />
+      <input id="sendLink" type="submit" value="Send Login Link" />
+    </div>
+    <div id="signedInArea" style="display: none">
+      <input id="logoutButton" type="submit" value="Logout" />
+    </div>
+  </body>
+</html>
