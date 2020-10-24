@@ -1,73 +1,15 @@
-var actionCodeSettings = {
-  url: window.location.href,
-  handleCodeInApp: true,
-};
-
-function login(){
-    const addy = document.getElementById('email').value;
-    firebase.auth().sendSignInLinkToEmail(addy, actionCodeSettings)
-    .then(function() {
-      window.localStorage.setItem('emailForSignIn', addy);
-    })
-    .catch(function(error) {
-    document.getElementById('message').innerHTML = "something went wrong...";
-    console.log(error);
-    });
-    document.getElementById('message').innerHTML = "link sent to email";
-    document.getElementById('loginArea').style.display = "none";
-    document.getElementById('signedInArea').style.display = "block";
-    document.getElementById('logoutButton').addEventListener('click', logout);
-}
-
-function logout(){
-
-
-  document.getElementById('loginArea').style.display = "block";
-  document.getElementById('signedInArea').style.display = "none";
-  document.getElementById('message').innerHTML = "Logged out";
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
-    var email = window.localStorage.getItem('emailForSignIn');
-    if (!email) {
-      email = window.prompt('Please provide your email for confirmation');
-    }
-    firebase.auth().signInWithEmailLink(email, window.location.href)
-    .then(function(result) { window.localStorage.removeItem('emailForSignIn'); })
-    .catch(function(error) { console.log(error); });
-    document.getElementById('loginArea').style.display = "none";
-    document.getElementById('signedInArea').style.display = "none";
-    document.getElementById('message').style.display = "none";
-    init();
-  }
-  else {
-    document.getElementById('message').innerHTML = "Test Complete";
-    document.getElementById('sendLink').addEventListener('click', login); 
-  }
-});
-                                                                                        //TODO fix setters and getters
-class GameObject                                                                        //anything in the game that can move
-{
-  constructor(context, xPos, yPos, zPos, xVel, yVel, zVel)                              //defines canvas context
-  {                                                                                     //position in 3 spatial axes 
-    this.context = context;                                                             //and velocity in 3 spatial axes
-    this.xPos = xPos;
-    this.yPos = yPos; 
-    this.zPos = zPos; 
-    this.xVel = xVel;
-    this.yVel = yVel;
-    this.zVel = zVel;
-  }
-}
-
-
-class Entity extends GameObject                                                        //anything in the game that collides
+class Entity                                                                           //anything in the game that collides
 {                                                                                      //expect for the player character
- 
+                                                                                       //TODO draw function to client
   constructor(context, xPos, yPos, zPos, xVel, yVel, zVel, scale, density)             //extends GameObject with scale and density
   {                                                                                    //for calculating physics interactions on collision   
     super(context, xPos, yPos, zPos, xVel, yVel, zVel);
+    this.xPos = xPos;
+    this.yPos = yPos;
+    this.zPos = zPos;
+    this.xVel = xVel;
+    this.yVel = yVel;
+    this.zVel = zVel;
     this.scale = scale;
     this.density = density;
     this.isColliding = false;
@@ -110,7 +52,7 @@ class Entity extends GameObject                                                 
 
 class Projectile                                                                     //emitted object which does not collide with players
 {                                                                                    //and only operates within one canvas. no Z-movement.
-
+                                                                                     //TODO need to move draw function to client
   constructor(context, xPos, yPos, xVel, yVel, scale, density)
   {
     this.context=context
@@ -195,12 +137,12 @@ class PowerUp                                                                   
   }
 }
                   
-class Player                                                                      //player character object
-{
-
-  constructor(context, xPos, yPos, xVel, yVel, scale, density, health)
-  {
-    this.context=context;
+class Player                                                                      //player character object. duplicated in TUT
+{                                                                                 //TODO Player object ON SERVER
+                                                                                  //TODO draw function needs to move to client
+  constructor(context, xPos, yPos, xVel, yVel, scale, density, health)            //May need to double up basic class information on
+  {                                                                               //So info is easier to handle since the draw function
+    this.context=context;                                                         //Requires it. Same with anything updating that draws 
     this.xPos=xPos;
     this.yPos=yPos;
     this.xVel=xVel;

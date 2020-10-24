@@ -1,3 +1,4 @@
+//MOVE TO CLIENT
 var playArea = {
 
 makeCanvasTags : function(amount)                          //create string containing all HTML canvas tags for placement in parent div tag

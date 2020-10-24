@@ -4,12 +4,146 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>In The Blood</title>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
-    <script> 
+    <script type="text/javascript" src="/js/playArea.js"></script>
+    <script type="text/javascript" src="view.js"></script>
+    <script>
       var socket = io();
-      socket.emit('happy');
+      //signin stuff
+
+      var signDiv = document.getElementById('signDiv');
+      var signDivUsername = document.getElementById('signDiv-user-name');
+      var signDivSignIn = document.getElementById('signDiv-signIn');
+      var signDivSignUp = document.getElementById('signDiv-signUp');
+      var signDivPassword = document.getElementById('signDiv-password');
+
+      signDivSignIn.onclick = function(){
+        socket.emit('signIn', {
+          username:signDivUsername.value,
+          password:signDivPassword.value});
+      }
+      signDivSignUp.onclick = function(){
+        socket.emit('signUp', {
+          username:signDivUsername.value,
+          password:signDivPassword,value});
+      }
+
+      socket.on('signInResponse', function(data){
+        if(data.success){//make signIn div invisible, make game div visible
+        }
+        else { alert("Sign in unsuccessful.");}
+      });
+      socket.on('singUpResponse', function(data){
+        if(data.success){//proceed from sing up
+        }
+        else{ alert("Sign up unsuccessful.");}
+      });
+
+      function init()                                                //game intro screen
+      {
+        var introTxt = "";                                           
+        introTxt += "<div style='text-align: center; width: 100%'>";
+        introTxt += "<br><br><u>STORY</u><br><br>";
+        introTxt += "Your patient is infected with a deadly blood disease!<br>";
+        introTxt += "The only way to stop the spread of infection is inserting<br>";
+        introTxt += "a remotely controlled micro-device that you control in<br>";
+        introTxt += " to clean the infected cells from the blood directly<br><br>";
+        introTxt += "<u>RULES</u><br><br>";
+        introTxt += "1) infections bubble up toward the camera. Black blood cells<br>";
+        introTxt += "are about to become infected.  Purple blood cells are infected!<br>";
+        introTxt += "Shoot purple cells with your anti-body weapons. Watch out for<br>";
+        introTxt += "black cells that may turn into purple cells.<br><br>";
+        introTxt += "2) If infected cells float past the bottom of your view, they<br>";
+        introTxt += "spread to the rest of the bloodstream and hurt the health of<br>";
+        introTxt += "your patient.  The bigger the infection, the bigger the hurt.<br>";
+        introTxt += "If your patient's health reaches zero, they die!<br><br>";
+        introTxt += "3) Your micro-device is coated in anti-bodies.  You can ram<br>";
+        introTxt += "infected cells with your micro-device to destroy them.  However,<br>";
+        introTxt += "each collision weakens your micro-device's hull integrity.  If it<br>";
+        introTxt += "reaches zero, your micro-device is destroyed and your patient dies!<br><br>";
+        introTxt += "<u>CONTROLS</u><br><br>";
+        introTxt += "W - Move Forward<br>";
+        introTxt += "S - Move Back<br>";
+        introTxt += "A - Rotate Left<br>";
+        introTxt += "D - Rotate Right<br>";
+        introTxt += "Left Click - fire<br>";
+        introTxt += "keep your mouse in the play area!<br><br>";
+        introTxt += "</div><br>";
+        introTxt += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to start</div>";
+        document.getElementById("parent").innerHTML = introTxt;                           //display intro text in div found in index  
+        document.getElementById("tempStart").addEventListener('click', initGame, false);  //initialize game when start is clicked
+      }
+  
+      function initGame()                                          //creates conditions necessary for building the game
+      {                                                            //MOVE TO CLIENT  
+        playArea.makeCanvasTags(numCanvases);                      //makes all the canvases and arrays to hold canvas drawn  
+        playArea.makeCanvases(numCanvases);                        //objects of an amount which is a power of 2
+        playArea.makeContexts(numCanvases);                        //due to the way color transitions are handled
+        playArea.linkContexts(numCanvases);                                
+        playArea.makeLayers(numCanvases);                          //TODO refactor player, weapons, ui canvas creation
+        playArea.makePlayerLayer();
+        playArea.makeWeaponsLayer();
+        view.makeUILayer();
+        player = new Player(playArea.playerContext, playArea.playerCanvas.width/2, playArea.playerCanvas.height/2, 0, 0, 20, 10000, 100);
+                                                             //creates new player. params are context, x position, y position, x velocity, y velocity, density, scale, health
+        playerObjects.push(player);                                //puts player into the array that will hold player objects meant not to collide.  may change for multiplayer
+        document.getElementById("parent").removeEventListener('click', initGame, false);    //change listeners for mouse input from menu to gameplay
+        document.getElementById("parent").style.cursor = "none";                            //no visible cursor
+        document.getElementById("parent").addEventListener('mousedown', controller.mouseDownHandler, false);//MOVE TO CLIENT
+        document.addEventListener('keydown', controller.keyDownHandler, false);                             //MOVE TO CLIENT  
+        document.addEventListener('keyup', controller.keyUpHandler, false);                                 //MOVE TO CLIENT
+      }
+      
+      //game stuff
+      var pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
+      document.getElementById("parent").addEventListener('mousedown', pressedKeys["m"] = true, false);//MOVE TO CLIENT
+      document.getElementById("parent").addEventListener('mouseup', pressedKeys["m"] = false, false);//MOVE TO CLIENT
+      document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
+      document.addEventListener('keyup', keyUpHandler, false);
+      
+      function keyUpHandler(e)                                          //manually tracks when certain keys are not pressed
+      {                                                        
+        if(e.key == "a"){ pressedKeys["a"] = false; }
+        else if(e.key == "d"){ pressedKeys["d"] = false; }
+        else if(e.key == "s"){ pressedKeys["s"] = false; }
+        else if(e.key == "w"){ pressedKeys["w"] = false; }
+      }
+
+      function keyDownHandler(e)                                        //manually tracks when certain keys are pressed
+      {                                                        
+        if(e.key == "a"){ pressedKeys["a"] = true; }
+        else if(e.key == "d"){ pressedKeys["d"] = true; }
+        else if(e.key == "s"){ pressedKeys["s"] = true; }
+        else if(e.key == "w"){ pressedKeys["w"] = true; }                                                    
+      }
+
+      var chatText = document.getElementById('chat');
+      var chatInput = documnet.getElementById('chat-input');
+      var chatForm = documnet.getElementById('chat-form');
+      var DEBUG = true;
       socket.on('socketUpdate', function(data){
       document.getElementById("parent").innerHTML = data;
       });
+      socket.on('addToChat', function(data){
+        chat.innerHTML =+ '<div>' + data + '</div>';
+      });
+      chatForm.onsubmit = function(e){
+        e.preventDefault();
+        if(chatInput.value[0] === '/')
+        {
+          socket.emit('evalServer', chatInput.value.slice(1));
+        }
+        else
+        {
+          socket.emit('sendMsgToServer', chatInput.value);
+        }
+        chatInput.value = '';
+      }
+      if(DEBUG)  //instead of this, check for DEBUG state on the server
+      {
+        socket.on('evalAnswer', function(data){
+          console.log(data);
+        });
+      }
     </script>
 <!--
     <script type="text/javascript" src="classes.js"></script>
@@ -20,8 +154,19 @@
 -->
   </head>
   <body>
+    <div id="signDiv">
+      Username: <input id="signDiv-username" type="text"></input><br>
+      Password: <input id="signDiv-password" type="password"></input>
+      <button id="signDiv-signIn>Sign In</button>
+      <button id="signDiv-signUp>Sign Up</button>
+    </div>
     <div id="parent" style="position:relative;">test
     </div>
+    <div id="chat" style="width:1024px; height:50px; overflow-y:scroll;">
+    </div>
+    <form id="chat-form">
+      <input id="chat-input" type="text" style="width:1024px;"></input>
+    </form>
 <!--
     <div id="message">Testing2...
     </div>

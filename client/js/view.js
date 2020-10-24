@@ -1,5 +1,6 @@
+//MOVE SOME TO CLIENT
 var view = {
-
+/*
 ticks : 0,                                                //tracks frames elapsed
 secs : 0,                                                 //tracks seconds elapsed
 mins : 0,                                                 //tracks minutes elapsed
@@ -13,7 +14,7 @@ makeUILayer : function()
   view.uiContext = view.uiCanvas.getContext('2d');        //context for that canvas
 }
 ,
-updateUI : function()
+updateUI : function()                                     //MOVE TO SERVER, send info to clients
 {
   if(!endGame())                                          //while game isnt over, update game time, score and multplier
   {
@@ -25,7 +26,7 @@ updateUI : function()
   view.updateUIElements();
 }
 ,
-updateTimer : function()
+updateTimer : function()                                  //MOVE TO SERVER, send info to clients
 {
   view.ticks++;                                           //ticks each frame at 60fps
   if(view.ticks >= 60)
@@ -40,7 +41,7 @@ updateTimer : function()
     view.secs=0;
   }
 }
-,
+,*/
 updateUIElements : function()                             //set up time played for display and then display UI elements
 {
   var secDisplay;
@@ -109,11 +110,11 @@ scoreDisplay : function()                                 //set up score to be d
   
   return scoreDis;
 }
-,
+/*,
 resetMultiplier : function()
 {
   view.multiplier = 1;
-}
+}*/
 };                                                      //updated from CSE322 to use for CSE4050
   
 

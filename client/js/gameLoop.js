@@ -1,7 +1,3 @@
-function test(){
-  document.getElementById('message').style.display = "success";
-}
-
 //TO DO add UI layer, player score, player health, weapons loadout
 
 //declaration
@@ -13,9 +9,10 @@ var spawnClock = 0;                                            //temp variables 
 var spawnRate = 10;                                            //every frame, also increase difficulty
 var player;                                                    //player character object
 var playerObjects = [];                                        //array that holds player and all player-fired objects
+var PLAYER_LIST = [];                                          //duplicated in TUT
 var patientHealth = 1000;                                      //health score metric for display
 var randomizer;                                                //variable for randomizing various processes
-var pressedKeys = {"a":false,"d":false,"s":false, "w":false};  //array that holds information about certain key presses. move out of game loop.
+var pressedKeys = {"a":false,"d":false,"s":false, "w":false};  //MOVE TO CLIENT WITH CONTROLLER
 var canvasObjects = [];                                        //holds the arrays that hold the objects for each canvas layer
 
                                                                //TODO add new weapons, weapons loadout?, weapon switching
@@ -64,7 +61,7 @@ function init()                                                //game intro scre
 }
   
 function initGame()                                          //creates conditions necessary for building the game
-{                                                              
+{                                                            //MOVE TO CLIENT  
   playArea.makeCanvasTags(numCanvases);                      //makes all the canvases and arrays to hold canvas drawn  
   playArea.makeCanvases(numCanvases);                        //objects of an amount which is a power of 2
   playArea.makeContexts(numCanvases);                        //due to the way color transitions are handled
@@ -78,9 +75,9 @@ function initGame()                                          //creates condition
   playerObjects.push(player);                                //puts player into the array that will hold player objects meant not to collide.  may change for multiplayer
   document.getElementById("parent").removeEventListener('click', initGame, false);    //change listeners for mouse input from menu to gameplay
   document.getElementById("parent").style.cursor = "none";                            //no visible cursor
-  document.getElementById("parent").addEventListener('mousedown', controller.mouseDownHandler, false);
-  document.addEventListener('keydown', controller.keyDownHandler, false);             //control input listeners
-  document.addEventListener('keyup', controller.keyUpHandler, false);
+  document.getElementById("parent").addEventListener('mousedown', controller.mouseDownHandler, false);//MOVE TO CLIENT
+  document.addEventListener('keydown', controller.keyDownHandler, false);                             //MOVE TO CLIENT  
+  document.addEventListener('keyup', controller.keyUpHandler, false);                                 //MOVE TO CLIENT
   window.requestAnimationFrame(gameLoop);                                             //initiate recursive game loop
 }
 
@@ -90,7 +87,7 @@ function fire()                                           //dynamically create m
   playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
 }
 
-function gameLoop(currentTime)                            //everything that occurs in the game during a given frame
+function gameLoop(currentTime)                            //everything that occurs in the game during a given frame. duplicated in TUT
 {
   randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
                                                           //TODO refactor into function. maybe move into cleanup loop    
@@ -102,19 +99,18 @@ function gameLoop(currentTime)                            //everything that occu
     spawnerLoop();                                        //loop that creates various game objects that are not the player
     spawnClock = 0;                                       //nor a player missile
   }
-  controller.handleInput();                               //process various buttons presses occuring during the frame
-                                                          //will likely need to move into player object for multiplayer
+  controller.handleInput();                               //INPUT ON CLIENT. HANDLE INPUT EMITTED INPUT HERE
   updateLoop(getTime(currentTime));                       //update of all game objects
                                                           //TODO refactor collision process        
   collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
 
   moveInZLoop();                                          //moves objects between canvas layers based on their z value
+                                                          //TRANSMIT DATA TO CLIENT HERE 
+  playArea.clearCanvases();                               //CLIENT
 
-  playArea.clearCanvases();                               //removes last frame's information from the various canvases
+  drawLoop();                                             //CLIENT
 
-  drawLoop();                                             //draws this frame's information to the various canvases
-
-  view.updateUI();                                        //calculates UI information and displays it in the UI canvas layer
+  view.updateUI();                                        //CLIENT
  
   window.requestAnimationFrame(gameLoop);                 //game loop function recursion
 }

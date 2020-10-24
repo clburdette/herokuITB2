@@ -1,7 +1,6 @@
-var controller = {                                                  //probably need to make this part of player object
-                                                                    //and iterate for multi.
-mouseDownHandler : function(){fire();}                              //executes fire function in gameloop on mouse down
-,                                                                   //probably need to move this to player object for multi
+var controller = {                                                  //MOVE TO CLIENT
+mouseDownHandler : function(){fire();}                              //CHANGE TO EMIT DATA RATHER THAN TRIGGER SERVER SIDE FUNCTION
+,                                                                   //EVENT LISTENERS CURRENTLY IN GAME LOOP
 keyUpHandler : function(e)                                          //manually tracks when certain keys are not pressed
 {                                                        
   if(e.key == "a")                                                  //pressed keys array found in game loop. needs to be
@@ -42,7 +41,7 @@ keyDownHandler : function(e)                                        //manually t
   }                                                    
 }
 ,
-handleInput : function()                                           //consequences of several multiple-button-press scenarios
+handleInput : function()                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
 {
   if(pressedKeys["a"]&&pressedKeys["d"]&&pressedKeys["w"])         //forward no rotation when a,d,w pressed
   {
