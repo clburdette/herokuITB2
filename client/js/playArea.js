@@ -26,7 +26,7 @@ makeCanvases : function(amount)                            //fills the array tha
   }
 }
 ,
-makeContexts : function(amount)                            //fills the array that will hold the canvas contexts with temp variables
+makeContexts : function(amount)                            //fills the array, that will hold the canvas contexts, with temp variables
 {
   for(var i=0; i < amount; i++)
   {
@@ -42,15 +42,6 @@ linkContexts : function(amount)                            //places canvas docum
     var temp = "canvas" + (i+1).toString();
     canvasBag[i] = document.getElementById(temp);
     contextBag[i] = canvasBag[i].getContext('2d');
-  }
-}
-,
-makeLayers : function(amount)                              //fills the canvasObjects array with empty arrays that will be
-{                                                          //used to hold dynamically created game objects
-  for(var i=0; i < amount; i++)
-  {
-    var temp = [];
-    canvasObjects.push(temp);
   }
 }
 ,

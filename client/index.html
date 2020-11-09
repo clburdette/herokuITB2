@@ -5,11 +5,20 @@
     <title>In The Blood</title>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
     <script type="text/javascript" src="/js/playArea.js"></script>
-    <script type="text/javascript" src="view.js"></script>
+    <script type="text/javascript" src="/js/view.js"></script>
+    <script type="text/javascript" src="/js/classes.js"></script>
     <script>
       var socket = io();
-      //signin stuff
+      var numCanvases = 16;                                          //defines amount of layers among play area objects
+      var canvasBag = [];                                            //holds canvas documents
+      var contextBag = [];
+      var layerObjects = [];                                           //holds canvas contexts
+      var player;
+      var playerObjects = [];
+      var intervalTime = 40;                                                   //player character object
 
+      //signin stuff
+/*
       var signDiv = document.getElementById('signDiv');
       var signDivUsername = document.getElementById('signDiv-user-name');
       var signDivSignIn = document.getElementById('signDiv-signIn');
@@ -37,6 +46,24 @@
         }
         else{ alert("Sign up unsuccessful.");}
       });
+*/    
+
+      function drawLoop()                                             //loops through the draw function of every game object
+      {
+        for(var i=0; i < playerObjects.length; i++)                   
+        {
+          playerObjects[i].draw();
+        } 
+
+        for(var i=0; i < canvasObjects.length; i++)
+        { 
+          var group = canvasObjects[i];
+          for(var j=0; j < group.length; j++)
+          {
+            group[j].draw();
+          }  
+        } 
+      }
 
       function init()                                                //game intro screen
       {
@@ -83,23 +110,70 @@
         playArea.makePlayerLayer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();
-        player = new Player(playArea.playerContext, playArea.playerCanvas.width/2, playArea.playerCanvas.height/2, 0, 0, 20, 10000, 100);
-                                                             //creates new player. params are context, x position, y position, x velocity, y velocity, density, scale, health
-        playerObjects.push(player);                                //puts player into the array that will hold player objects meant not to collide.  may change for multiplayer
         document.getElementById("parent").removeEventListener('click', initGame, false);    //change listeners for mouse input from menu to gameplay
         document.getElementById("parent").style.cursor = "none";                            //no visible cursor
-        document.getElementById("parent").addEventListener('mousedown', controller.mouseDownHandler, false);//MOVE TO CLIENT
-        document.addEventListener('keydown', controller.keyDownHandler, false);                             //MOVE TO CLIENT  
-        document.addEventListener('keyup', controller.keyUpHandler, false);                                 //MOVE TO CLIENT
+        document.getElementById("parent").addEventListener('mousedown', pressedKeys["m"] = true, false);//MOVE TO CLIENT
+        document.getElementById("parent").addEventListener('mouseup', pressedKeys["m"] = false, false);//MOVE TO CLIENT
+        document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
+        document.addEventListener('keyup', keyUpHandler, false);
+        socket.emit('startGame');
+        setInterval(function(){
+          socket.emit('playerInput', pressedKeys);
+          socket.on('playerLayer', function(data){
+            if(data)
+            {
+              playerObjects = data;
+              playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
+              playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
+              for(var i=0; i < playerObjects.length; i++)                   
+              {
+                playerObjects[i].draw();
+              }                                            //loops through the draw function of every game object
+            }
+            else{console.log("no playerLayer data");}
+          });                      
+          socket.on('objectLayers', function(data){
+            if(data)
+            {
+              layerObjects = data;
+              for(i=0; i < contextBag.length; i++)
+                {
+                  contextBag[i].clearRect(0,0,canvasBag[i].width,canvasBag[i].height);
+                }
+                for(var i=0; i < layerObjects.length; i++)
+                {
+                  var group = layerObjects[i];
+                  for(var j=0; j < group.length; j++)
+                  {
+                    group[j].draw();
+                  }  
+            }                                            //loops through the draw function of every game object
+            }
+            else{console.log("no objectLayer data");}
+          });
+          socket.on('viewLayer', function(data){
+            if(data)
+            {
+              view.sec = data.secs;
+              view.mins = data.mins;
+              view.playerScaore = data.playerScore;
+              view.multiplier = data.multiplier;
+              view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
+              view.updateUIElements();
+            }
+            else{console.log("no UI data");}
+          });
+        },intervalTime);
       }
       
       //game stuff
       var pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
+      /*
       document.getElementById("parent").addEventListener('mousedown', pressedKeys["m"] = true, false);//MOVE TO CLIENT
       document.getElementById("parent").addEventListener('mouseup', pressedKeys["m"] = false, false);//MOVE TO CLIENT
       document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
       document.addEventListener('keyup', keyUpHandler, false);
-      
+      */
       function keyUpHandler(e)                                          //manually tracks when certain keys are not pressed
       {                                                        
         if(e.key == "a"){ pressedKeys["a"] = false; }
@@ -115,14 +189,16 @@
         else if(e.key == "s"){ pressedKeys["s"] = true; }
         else if(e.key == "w"){ pressedKeys["w"] = true; }                                                    
       }
-
+/*
       var chatText = document.getElementById('chat');
       var chatInput = documnet.getElementById('chat-input');
       var chatForm = documnet.getElementById('chat-form');
+*/
       var DEBUG = true;
       socket.on('socketUpdate', function(data){
       document.getElementById("parent").innerHTML = data;
       });
+      /*
       socket.on('addToChat', function(data){
         chat.innerHTML =+ '<div>' + data + '</div>';
       });
@@ -144,16 +220,13 @@
           console.log(data);
         });
       }
+      */
     </script>
-<!--
-    <script type="text/javascript" src="classes.js"></script>
-    <script type="text/javascript" src="controller.js"></script>
-    <script type="text/javascript" src="gameLoop.js"></script>
-    <script type="text/javascript" src="playArea.js"></script>
-    <script type="text/javascript" src="view.js"></script>
--->
   </head>
-  <body>
+  <body onload = "init()">
+    <div id="parent" style="position:relative;">test
+    </div>
+    <!--
     <div id="signDiv">
       Username: <input id="signDiv-username" type="text"></input><br>
       Password: <input id="signDiv-password" type="password"></input>
@@ -167,16 +240,6 @@
     <form id="chat-form">
       <input id="chat-input" type="text" style="width:1024px;"></input>
     </form>
-<!--
-    <div id="message">Testing2...
-    </div>
-    <div id="loginArea">
-      Email: <input id="email" type="text" value="clburdette@yahoo.com" />
-      <input id="sendLink" type="submit" value="Send Login Link" />
-    </div>
-    <div id="signedInArea" style="display: none">
-      <input id="logoutButton" type="submit" value="Logout" />
-    </div>
--->
+  -->
   </body>
 </html>

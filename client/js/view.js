@@ -1,6 +1,6 @@
 //MOVE SOME TO CLIENT
 var view = {
-/*
+
 ticks : 0,                                                //tracks frames elapsed
 secs : 0,                                                 //tracks seconds elapsed
 mins : 0,                                                 //tracks minutes elapsed
@@ -14,6 +14,7 @@ makeUILayer : function()
   view.uiContext = view.uiCanvas.getContext('2d');        //context for that canvas
 }
 ,
+/*
 updateUI : function()                                     //MOVE TO SERVER, send info to clients
 {
   if(!endGame())                                          //while game isnt over, update game time, score and multplier
