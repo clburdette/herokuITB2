@@ -3,7 +3,6 @@ class Entity                                                                    
                                                                                        //TODO draw function to client
   constructor(context, xPos, yPos, zPos, xVel, yVel, zVel, scale, density)             //extends GameObject with scale and density
   {                                                                                    //for calculating physics interactions on collision   
-    super(context, xPos, yPos, zPos, xVel, yVel, zVel);
     this.xPos = xPos;
     this.yPos = yPos;
     this.zPos = zPos;
@@ -156,34 +155,9 @@ class Player                                                                    
     this.health=health;                                                          //health of the player object. displayed as hull.
     this.isColliding=false;
     this.angle=0;                                                                //angle of the player's forward vector in relation to true north
-    this.MAX_MAG=25;                                                             //maximum velocity of player object
-    this.weapons=[];                                                             //for future expansion. will hold player object's weapons objects
+    this.MAX_MAG=25;                                                             //maximum velocity of player object                                                             //for future expansion. will hold player object's weapons objects
   }
 
-  set Health(amount){this.health = amount;}                                      //TODO figure out what I was doing here    
-  get Health(){return this.health;}
-  set XVel(amount){this.xVel = amount;}
-  get XVel(){return this.xVel;}
-  set YVel(amount){this.yVel = amount;}
-  get YVel(){return this.yVel;}
-  set Angle(amount){this.angle = amount;}
-  get Angle(){return this.angle;}
-  get FirePointX(){return this.firePointX;} 
-  get FirePointY(){return this.firePointY;}
-
-  changeVel(xValue, yValue)                                                      //TODO figure out what I was doing here
-  {
-    this.xVel += xValue;
-    this.yVel += yValue;
-  }
-  changeAngle(amount)
-  {
-    this.angle += amount;
-  }
-  changeHealth(amount)
-  {
-    this.health += amount;
-  }  
   draw()                                                                        //TO DO upgrade player appearance
   {
     this.context.save();
@@ -210,6 +184,20 @@ class Player                                                                    
       this.health--;
     }
     this.context.restore();          
+  }
+
+  changeVel(xValue, yValue)                                                      //TODO figure out what I was doing here
+  {
+    this.xVel += xValue;
+    this.yVel += yValue;
+  }
+  changeAngle(amount)
+  {
+    this.angle += amount;
+  }
+  changeHealth(amount)
+  {
+    this.health += amount;
   }
 
   update(seconds)

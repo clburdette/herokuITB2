@@ -76,10 +76,6 @@ updateUIElements : function()                             //set up time played f
   }
   view.displayUIElement('25px Arial','white','score: ' + view.scoreDisplay(), 417.5, 60); 
   view.displayUIElement('25px Arial','white','health: ' + patientHealth, 875, 30);                      //health display
-  if(endGame())                                                                                    
-  {
-    view.displayUIElement('144px Impact','red','YOU LOSE', 256, 400);                                   //display game over
-  }
 }
 ,
 displayUIElement : function(font,color,statement,xPos,yPos)

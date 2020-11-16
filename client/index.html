@@ -1,21 +1,22 @@
-<html>
+<html>                                                                
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport">
     <title>In The Blood</title>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
-    <script type="text/javascript" src="/js/playArea.js"></script>
-    <script type="text/javascript" src="/js/view.js"></script>
-    <script type="text/javascript" src="/js/classes.js"></script>
+    <script type="text/javascript" src="/client/js/playArea.js"></script>
+    <script type="text/javascript" src="/client/js/view.js"></script>
     <script>
-      var socket = io();
-      var numCanvases = 16;                                          //defines amount of layers among play area objects
-      var canvasBag = [];                                            //holds canvas documents
-      var contextBag = [];
-      var layerObjects = [];                                           //holds canvas contexts
+      var socket = io();                                             //TODO   FIX reversed layer object colors 
+      var numCanvases = 16;                                          //TODO   FIX multiplier
+      var canvasBag = [];                                            //TODO   FIX hull and score issues
+      var contextBag = [];                                           //TODO   address sluggishness and framerate
+      var layerObjects = [];                                         
       var player;
-      var playerObjects = [];
-      var intervalTime = 40;                                                   //player character object
+      var playerObjects = [];                                        
+      var patientHealth = 1000;
+      var intervalTime = 20;
+      var tick = 0;                                                  //player character object
 
       //signin stuff
 /*
@@ -47,7 +48,7 @@
         else{ alert("Sign up unsuccessful.");}
       });
 */    
-
+/*
       function drawLoop()                                             //loops through the draw function of every game object
       {
         for(var i=0; i < playerObjects.length; i++)                   
@@ -63,6 +64,33 @@
             group[j].draw();
           }  
         } 
+      }
+*/
+      function drawPlayer()
+      {
+        playArea.playerContext.save();
+        playArea.playerContext.translate(player.xPos, player.yPos);                               //move player canvas to new position
+        playArea.playerContext.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
+        playArea.playerContext.beginPath();                                                   //TODO only draw when player is imparting thrust
+        playArea.playerContext.arc(player.FirePointX/-2, player.FirePointY/-2, 14, 0, 2*Math.PI);
+        playArea.playerContext.fill();
+        playArea.playerContext.fillStyle = '#0000FF';                                         //draw player fire point graphic
+        playArea.playerContext.beginPath();
+        playArea.playerContext.arc(player.FirePointX, player.FirePointY, 4, 0, 2*Math.PI);
+        playArea.playerContext.fill();
+        playArea.playerContext.rotate(player.angle);                                            //rotate canvas to the player's rotation 
+        playArea.playerContext.fillStyle = '#00FF00';                                         //draw main body of player object
+        playArea.playerContext.beginPath();                                                   //canvas is translated and rotated. player object
+        playArea.playerContext.arc(0, 0, player.scale, 0, 2*Math.PI);                           //is rendered normally to make the player object
+        playArea.playerContext.fill();                                                        //appear to translate and rotate relative to
+        if(player.isColliding)                                                        //player view
+          {
+              playArea.playerContext.fillStyle = '#FF0000';                                       //recolors player object on collision to indicate
+              playArea.playerContext.beginPath();                                                 //to the player that a collision has occurred
+              playArea.playerContext.arc(0, 0, this.scale, 0, 2*Math.PI);     
+              playArea.playerContext.fill();
+          }
+        playArea.playerContext.restore();
       }
 
       function init()                                                //game intro screen
@@ -97,72 +125,74 @@
         introTxt += "</div><br>";
         introTxt += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to start</div>";
         document.getElementById("parent").innerHTML = introTxt;                           //display intro text in div found in index  
-        document.getElementById("tempStart").addEventListener('click', initGame, false);  //initialize game when start is clicked
+        document.getElementById("tempStart").addEventListener('click', initGame, false);
+        console.log("init page loaded");
+          //initialize game when start is clicked
       }
   
       function initGame()                                          //creates conditions necessary for building the game
-      {                                                            //MOVE TO CLIENT  
+      { 
+        console.log("initGame function accessed");                                                           //MOVE TO CLIENT  
         playArea.makeCanvasTags(numCanvases);                      //makes all the canvases and arrays to hold canvas drawn  
         playArea.makeCanvases(numCanvases);                        //objects of an amount which is a power of 2
         playArea.makeContexts(numCanvases);                        //due to the way color transitions are handled
         playArea.linkContexts(numCanvases);                                
-        playArea.makeLayers(numCanvases);                          //TODO refactor player, weapons, ui canvas creation
         playArea.makePlayerLayer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();
         document.getElementById("parent").removeEventListener('click', initGame, false);    //change listeners for mouse input from menu to gameplay
         document.getElementById("parent").style.cursor = "none";                            //no visible cursor
-        document.getElementById("parent").addEventListener('mousedown', pressedKeys["m"] = true, false);//MOVE TO CLIENT
-        document.getElementById("parent").addEventListener('mouseup', pressedKeys["m"] = false, false);//MOVE TO CLIENT
+        document.getElementById("parent").addEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);//MOVE TO CLIENT
+        document.getElementById("parent").addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
         document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
         document.addEventListener('keyup', keyUpHandler, false);
+        console.log("initGame function processed");
         socket.emit('startGame');
+        console.log("initGame startGame signal emitted");
         setInterval(function(){
-          socket.emit('playerInput', pressedKeys);
-          socket.on('playerLayer', function(data){
-            if(data)
-            {
-              playerObjects = data;
+              socket.emit('playerInput', pressedKeys);
               playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
               playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
+              drawPlayer();
               for(var i=0; i < playerObjects.length; i++)                   
               {
-                playerObjects[i].draw();
-              }                                            //loops through the draw function of every game object
-            }
-            else{console.log("no playerLayer data");}
-          });                      
-          socket.on('objectLayers', function(data){
-            if(data)
-            {
-              layerObjects = data;
+                playArea.weaponsContext.fillStyle = '#000000';                  
+                playArea.weaponsContext.beginPath();
+                playArea.weaponsContext.arc(playerObjects[i].xPos, playerObjects[i].yPos, playerObjects[i].scale, 0, 2*Math.PI);     
+                playArea.weaponsContext.fill();
+              }                    
+
               for(i=0; i < contextBag.length; i++)
-                {
+              {
                   contextBag[i].clearRect(0,0,canvasBag[i].width,canvasBag[i].height);
-                }
-                for(var i=0; i < layerObjects.length; i++)
+              }
+              for(var i=0; i < layerObjects.length; i++)
+              {
+                var group = layerObjects[i];
+                for(var j=0; j < group.length; j++)
                 {
-                  var group = layerObjects[i];
-                  for(var j=0; j < group.length; j++)
+                  if(i == [numCanvases-1])                                       //in the appropriate color 
                   {
-                    group[j].draw();
-                  }  
-            }                                            //loops through the draw function of every game object
-            }
-            else{console.log("no objectLayer data");}
-          });
-          socket.on('viewLayer', function(data){
-            if(data)
-            {
-              view.sec = data.secs;
-              view.mins = data.mins;
-              view.playerScaore = data.playerScore;
-              view.multiplier = data.multiplier;
+                    contextBag[i].fillStyle = '#440033';
+                  }
+                  else
+                  {
+                    var num = (256/numCanvases)*(16-i);                                              //non-player objects are purple when they are on
+                    var color = '#' + num.toString(16) + '0000';                                //the same canvas as the player(s) and can collide
+                    contextBag[i].fillStyle = color;                                             //with them 
+                  }
+                  contextBag[i].beginPath();                                                         //draw circle representing blood vessel in blood stream                         
+                  contextBag[i].arc(group[j].xPos, group[j].yPos, group[j].scale, 0, 2*Math.PI);
+                  contextBag[i].fill();
+                }
+              }
+
               view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
               view.updateUIElements();
-            }
-            else{console.log("no UI data");}
-          });
+              console.log("viewLayer data received");
+
+          tick++;
+          console.log(tick);
         },intervalTime);
       }
       
@@ -189,15 +219,40 @@
         else if(e.key == "s"){ pressedKeys["s"] = true; }
         else if(e.key == "w"){ pressedKeys["w"] = true; }                                                    
       }
+
+      socket.on('playerLayer', function(data){
+        if(data)
+        {
+          playerObjects = data;
+          player = playerObjects[0];
+        }
+      });
+      socket.on('objectLayers', function(data){
+        if(data){layerObjects = data;}
+      });
+      socket.on('viewLayer', function(data){
+        if(data)
+        {
+          view.sec = data.secs;
+          view.mins = data.mins;
+          view.playerScaore = data.playerScore;
+          view.multiplier = data.multiplier;
+          patientHealth = data.patientHealth;
+        }
+      });       
+      
 /*
+      
       var chatText = document.getElementById('chat');
       var chatInput = documnet.getElementById('chat-input');
       var chatForm = documnet.getElementById('chat-form');
 */
+/*
       var DEBUG = true;
       socket.on('socketUpdate', function(data){
       document.getElementById("parent").innerHTML = data;
       });
+      */
       /*
       socket.on('addToChat', function(data){
         chat.innerHTML =+ '<div>' + data + '</div>';
@@ -224,7 +279,7 @@
     </script>
   </head>
   <body onload = "init()">
-    <div id="parent" style="position:relative;">test
+    <div id="parent" style="position:relative;">
     </div>
     <!--
     <div id="signDiv">

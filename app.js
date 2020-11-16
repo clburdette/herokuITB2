@@ -104,15 +104,14 @@ class Player                                                                    
     this.yVel=yVel;
     this.xVec=0;                                                                 //x and y component of the object's
     this.yVec=1;                                                                 //normalized forward vector 
-    this.firePointX=0;                                                           //point on the screen where the player
-    this.firePointY=scale;                                                       //character's Projectiles/Weapons originate
+    this.FirePointX=0;                                                           //point on the screen where the player
+    this.FirePointY=scale;                                                       //character's Projectiles/Weapons originate
     this.scale=scale;
     this.density=density;
     this.health=health;                                                          //health of the player object. displayed as hull.
     this.isColliding=false;
     this.angle=0;                                                                //angle of the player's forward vector in relation to true north
-    this.MAX_MAG=25;                                                             //maximum velocity of player object
-    this.weapons=[];                                                             //for future expansion. will hold player object's weapons objects
+    this.MAX_MAG=25;                                                             //maximum velocity of player object                                                            //for future expansion. will hold player object's weapons objects
   }
  
   draw()                                                                        //TO DO upgrade player appearance
@@ -121,11 +120,11 @@ class Player                                                                    
     this.context.translate(this.xPos, this.yPos);                               //move player canvas to new position
     this.context.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
     this.context.beginPath();                                                   //TODO only draw when player is imparting thrust
-    this.context.arc(this.firePointX/-2, this.firePointY/-2, 14, 0, 2*Math.PI);
+    this.context.arc(this.FirePointX/-2, this.FirePointY/-2, 14, 0, 2*Math.PI);
     this.context.fill();
     this.context.fillStyle = '#0000FF';                                         //draw player fire point graphic
     this.context.beginPath();
-    this.context.arc(this.firePointX, this.firePointY, 4, 0, 2*Math.PI);
+    this.context.arc(this.FirePointX, this.FirePointY, 4, 0, 2*Math.PI);
     this.context.fill();
     this.context.rotate(this.angle);                                            //rotate canvas to the player's rotation 
     this.context.fillStyle = '#00FF00';                                         //draw main body of player object
@@ -143,12 +142,29 @@ class Player                                                                    
     this.context.restore();          
   }
 
+  changeVel(xValue, yValue)                                                      //TODO figure out what I was doing here
+  {
+    console.log("x: " + xValue + " y: " + yValue);
+    console.log("bxvel: " + this.xVel + " byvel: " + this.yVel);
+    this.xVel += xValue;
+    this.yVel += yValue;
+    console.log("axvel: " + this.xVel + " ayvel: " + this.yVel);
+  }
+  changeAngle(amount)
+  {
+    this.angle += amount;
+  }
+  changeHealth(amount)
+  {
+    this.health += amount;
+  }
+
   update(seconds)
   {
     this.xVec = Math.sin(this.angle);                                           //calculate forward vector based on
     this.yVec = Math.cos(this.angle);                                           //player character object's rotation
-    this.firePointX=this.xVec*this.scale;                                       //calculate position of fire point
-    this.firePointY=this.yVec*this.scale*(-1);                                  //based on forward vector    
+    this.FirePointX=this.xVec*this.scale;                                       //calculate position of fire point
+    this.FirePointY=this.yVec*this.scale*(-1);                                  //based on forward vector    
     if(this.xVel != 0){this.xVel*=0.99;}                                        //friction
     if(this.yVel != 0){this.yVel*=0.99;}
     this.yVel += 0.003;                                                         //effect of blood flow on players
@@ -194,7 +210,8 @@ var randomizer;                                                //variable for ra
 var layerObjects = [];
 var bRunLoop = false;
 var bResetMultiplier = false;                             //TODO move to player object?
-var intervalTime = 40;
+var intervalTime = 20;
+var tick = 0;
 var pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
 var viewPackage = {                                                //in game loop                                                //tracks frames elapsed
   secs : 0,                                                 //tracks seconds elapsed
@@ -208,32 +225,6 @@ function fire()                                           //dynamically create m
 {                                                         //refactor this out of game loop and into player object for multiplayer                        
   var spawn = new Projectile(player.xPos+player.FirePointX, player.yPos+player.FirePointY, player.FirePointX*25, player.FirePointY*25, 10, 2);
   playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
-}
-if(bRunLoop)
-{
-  setInterval(function(){
-    randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
-                                                            //TODO refactor into function. maybe move into cleanup loop    
-    cleanUpLoop();                                          //removes non-player objects from their arrays for gabage collection when off screen 
-
-    spawnClock++                                            //temporary spawner delay to increase difficulty
-    if(spawnClock==spawnRate)                               
-    {
-      spawnerLoop();                                        //loop that creates various game objects that are not the player
-      spawnClock = 0;                                       //nor a player missile
-    }
-    handleInput();                                          //INPUT ON CLIENT. HANDLE INPUT EMITTED INPUT HERE
-    updateLoop(intervalTime/1000);                          //update of all game objects
-                                                            //TODO refactor collision process        
-    collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
-
-    moveInZLoop();                                          //moves objects between canvas layers based on their z value
-
-    view.update();
-
-    sendData();
-                                                            //TRANSMIT DATA TO CLIENT HERE 
-  },intervalTime);
 }
 
 function sendData()
@@ -324,7 +315,7 @@ function spawner(objects)                                 //dynamically spawns o
     {
       for(var i=0; i < layerObjects.length-1;i++)
       {
-        if(objects==canvasObjects[i])
+        if(objects==layerObjects[i])
         { 
           randomZ = Math.floor(Math.random() * (80/numCanvases)) + ((i+1)*(80/numCanvases));
         }
@@ -338,7 +329,7 @@ function spawner(objects)                                 //dynamically spawns o
 function spawnerLoop()                                 //randomly chooses an array of objects from the "bottom" 6 game layers
 {                                                      //and passes it into the spawner function
   var ranCanvas = Math.floor(Math.random() * 5);       //TODO rename function. This is not a loop.
-  spawner(canvasObjects[ranCanvas]);
+  spawner(layerObjects[ranCanvas]);
 }
 
 function cleanUpOffScreen(objects)                     //checks if objects have strayed too far off screen and removes them
@@ -351,7 +342,7 @@ function cleanUpOffScreen(objects)                     //checks if objects have 
        (obj.yPos-obj.scale)>768||
        (obj.yPos+obj.scale*10)<0)
     {
-      if((obj.yPos-obj.scale)>768 && objects==canvasObjects[numCanvases-1])
+      if((obj.yPos-obj.scale)>768 && objects==layerObjects[numCanvases-1])
       {
         patientHealth -= obj.scale;                    //effects patient health score and resets multiplier
         bResetMultiplier = true;                        //if object removed from past bottom of screen. (i.e. pathogen
@@ -383,18 +374,15 @@ function cleanUpLoop()                                 //sends each canvas layer
 {
   cleanUpWeapons();
 
-  for(var i=0;i<canvasObjects.length;i++)
+  for(var i=0;i<layerObjects.length;i++)
   { 
-    cleanUpOffScreen(canvasObjects[i]);
+    cleanUpOffScreen(layerObjects[i]);
   } 
 }
 
 function handleInput()                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
 {
-  socket.on('playerInput', function(data){
-    pressedKeys = data;
-    });
-  if(!pressedKeys || pressedkey == null)
+  if(!pressedKeys || pressedKeys == null)
   { 
     pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
   }
@@ -436,9 +424,11 @@ function handleInput()                                           //KEEP ON SERVE
   }
   else if(pressedKeys["w"])                                       //forward when w only pressed
   {
-    player.changeVel(0.01*player.FirePointX,0.01*player.FirePointY);               
+    player.changeVel(0.01*player.FirePointX,0.01*player.FirePointY);
+    console.log("W PRESSED MOVE UP")               
   }
   if(pressedKeys["m"]){ fire(); }
+  console.log(pressedKeys);
 }
 function updateLoop(delta)                             //input parameter is amount of time which has passed during a given frame
 {                                                      //which is then passed into the update function of each object in the game
@@ -718,6 +708,7 @@ var view = {                                                //in game loop
     viewPackage.mins = view.mins;
     viewPackage.playerScore = view.playerScore;
     viewPackage.multiplier = view.multiplier;
+    viewPackage.patientHealth = patientHealth;
   }
   ,
   update : function()                                     //MOVE TO SERVER, send info to clients
@@ -753,12 +744,12 @@ var view = {                                                //in game loop
   }
   };                                                      //updated from CSE322 to use for CSE4050
   
-var SOCKET_LIST = {};
-var PLAYER_LIST = {};
+//var SOCKET_LIST = {};
+//var PLAYER_LIST = {};
 var playerConnected = false;
-var USERS = {};
-var DEBUG = true;
-
+//var USERS = {};
+//var DEBUG = true;
+/*
 function loadLoginData()
 {
   fs.fileRead('login.json', function(data2){
@@ -784,13 +775,15 @@ var addUser = function(data){
     else{console.log('data written to login file');}
   })
 }
+*/
 var io = require('socket.io')(serv,{});
 io.sockets.on('connection', function(socket){
-  socket.id = Math.random();
-  SOCKET_LIST[socket.id] = socket;
+  //socket.id = Math.random();
+  //SOCKET_LIST[socket.id] = socket;
   playerConnected = true;
   console.log('socket connection');
 
+/*
   socket.on('signIn', function(data){
     var valid; //placeholder
     //validate sign in against database
@@ -813,35 +806,76 @@ io.sockets.on('connection', function(socket){
       socket.emit('singUpResponse', {success:true});
     }
   }
+*/
 /*
   var player = Player(socket.id);
   PLAYER_LIST[socket.id] = player;
   console.log('new player created');
 */
+/*
   socket.on('disconnect', function(){
     delete SOCKET_LIST[socket.id];
     delete PLAYER_LIST[socket.id];
   });
-
+*/
+  function sendData()
+  {
+    socket.emit('playerLayer', playerObjects);
+    socket.emit('objectLayers', layerObjects);
+    socket.emit('viewLayer', viewPackage);
+  }
   socket.on('playerInput', function(data){
-  //trigger handle input function for this player
+    pressedKeys = data;
   });
 
   socket.on('startGame', function(){
-    player = new Player(playArea.playerContext, playArea.playerCanvas.width/2, playArea.playerCanvas.height/2, 0, 0, 20, 10000, 100);
-    //creates new player. params are context, x position, y position, x velocity, y velocity, density, scale, health
+    player = new Player(512, 384, 0, 0, 20, 10000, 100);
+    console.log("player created " + player.xPos);
+    //creates new player. params are x position, y position, x velocity, y velocity, density, scale, health
     playerObjects.push(player);
+    console.log("player pushed " + player.xPos);   
+    console.log("player in playerObjects " + playerObjects[0].xPos);
     makeLayers(numCanvases);
-    bRunLoop = true;
-  });
+    console.log("layers made");
+    setInterval(function(){
+      console.log("player start loop: " + player.xPos);
+      randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
+                                                              //TODO refactor into function. maybe move into cleanup loop    
+      cleanUpLoop();                                          //removes non-player objects from their arrays for gabage collection when off screen 
+  
+      spawnClock++                                            //temporary spawner delay to increase difficulty
+      if(spawnClock==spawnRate)                               
+      {
+        spawnerLoop();                                        //loop that creates various game objects that are not the player
+        spawnClock = 0;                                       //nor a player missile
+      }
+      console.log("player mid loop: " + player.xPos);
 
+      handleInput();                                          //INPUT ON CLIENT. HANDLE INPUT EMITTED INPUT HERE
+      updateLoop(intervalTime/1000);                          //update of all game objects
+                                                              //TODO refactor collision process        
+      collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
+  
+      moveInZLoop();                                          //moves objects between canvas layers based on their z value
+  
+      view.update();
+  
+      sendData();
+                                                              //TRANSMIT DATA TO CLIENT HERE
+      tick++;
+      console.log(tick); 
+    },intervalTime);
+  });
+});
+/*
   socket.on('sendMsgToServer', function(data){
     var playerName = socket.id;
     for(var i in SOCKET_LIST){
       SOCKET_LIST[i].emit('addToChat', playerName + ': ' + data);
     }
   });
-
+*/
+/*
   if(DEBUG)
   {
     socket.on('evalServer', function(data){
@@ -850,6 +884,7 @@ io.sockets.on('connection', function(socket){
     });
   }
 });
+*/
 /*
 setInterval(function(){
   var pack = [];
