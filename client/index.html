@@ -16,7 +16,8 @@
       var playerObjects = [];                                        
       var patientHealth = 1000;
       var intervalTime = 20;
-      var tick = 0;                                                  //player character object
+      var tick = 0;
+      var requestSent = false;                                                  //player character object
 
       //signin stuff
 /*
@@ -125,9 +126,19 @@
         introTxt += "</div><br>";
         introTxt += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to start</div>";
         document.getElementById("parent").innerHTML = introTxt;                           //display intro text in div found in index  
-        document.getElementById("tempStart").addEventListener('click', initGame, false);
+        document.getElementById("tempStart").addEventListener('click', requestGameStart, false);
         console.log("init page loaded");
           //initialize game when start is clicked
+      }
+      function requestGameStart()
+      {
+        if(!requestSent)
+        {
+          socket.emit('startGame');
+          console.log("start game request sent");
+          requestSent = true;
+          initGame();
+        }
       }
   
       function initGame()                                          //creates conditions necessary for building the game
@@ -140,16 +151,14 @@
         playArea.makePlayerLayer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();
-        document.getElementById("parent").removeEventListener('click', initGame, false);    //change listeners for mouse input from menu to gameplay
+        document.getElementById("parent").removeEventListener('click', requestGameStart, false);    //change listeners for mouse input from menu to gameplay
         document.getElementById("parent").style.cursor = "none";                            //no visible cursor
         document.getElementById("parent").addEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);//MOVE TO CLIENT
         document.getElementById("parent").addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
         document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
         document.addEventListener('keyup', keyUpHandler, false);
-        console.log("initGame function processed");
-        socket.emit('startGame');
-        console.log("initGame startGame signal emitted");
-        setInterval(function(){
+        var myInterval = setInterval(gameLoop, intervalTime)
+        function gameLoop(){
               socket.emit('playerInput', pressedKeys);
               playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
               playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
@@ -189,11 +198,10 @@
 
               view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
               view.updateUIElements();
-              console.log("viewLayer data received");
+
 
           tick++;
-          console.log(tick);
-        },intervalTime);
+        }
       }
       
       //game stuff
