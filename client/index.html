@@ -16,8 +16,12 @@
       var playerObjects = [];                                        
       var patientHealth = 1000;
       var intervalTime = 20;
-      var tick = 0;
-      var requestSent = false;                                                  //player character object
+      var ticks = 0;
+      var secs = 0;
+      var mins = 0;
+      var serverAccept = false;
+      var restartClicked = false;
+      var myInterval                                                 //player character object
 
       //signin stuff
 /*
@@ -130,16 +134,31 @@
         console.log("init page loaded");
           //initialize game when start is clicked
       }
+
       function requestGameStart()
       {
-        if(!requestSent)
+        if(!serverAccept)
         {
           socket.emit('startGame');
           console.log("start game request sent");
-          requestSent = true;
-          initGame();
+        }
+        else
+        {
+          console.log("game start error");
+          document.getElementById("parent").innerHTML = "an error occurred. please reload this page.";
         }
       }
+
+      socket.on("gameStarted", function(){
+        serverAccept = true;
+        restartClicked - false;
+        initGame();
+      });
+
+      socket.on("serverFull", function(){
+        document.getElementById("parent").innerHTML = "server full. please wait for game to start";
+        requestGameStart();
+      });
   
       function initGame()                                          //creates conditions necessary for building the game
       { 
@@ -157,7 +176,7 @@
         document.getElementById("parent").addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
         document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
         document.addEventListener('keyup', keyUpHandler, false);
-        var myInterval = setInterval(gameLoop, intervalTime)
+        myInterval = setInterval(gameLoop, intervalTime)
         function gameLoop(){
               socket.emit('playerInput', pressedKeys);
               playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
@@ -195,15 +214,35 @@
                   contextBag[i].fill();
                 }
               }
-
               view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
-              view.updateUIElements();
-
-
-          tick++;
+              view.updateUI();
         }
       }
-      
+
+      function postGame()
+      {
+        var postText = "";
+        document.getElementById("parent").style.cursor = "auto";                            //no visible cursor
+        document.getElementById("parent").removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);//MOVE TO CLIENT
+        document.getElementById("parent").removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
+        document.removeEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
+        document.removeEventListener('keyup', keyUpHandler, false);
+        postText += "<div style='text-align: center; width: 100%'>You Lose!</div>";
+        postText += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to restart</div>"
+        postText += "<div style='text-align: center; width: 100%'>or close browser tab to quit.</div>";
+        document.getElementById("parent").innerHTML = postText;                           //display intro text in div found in index  
+        document.getElementById("tempStart").addEventListener('click', restartGame, false);
+      }
+
+      function restartGame()
+      {
+        if(!restartClicked)
+        {
+          document.getElementById("tempStart").removeEventListener('click', restartGame, false);
+          socket.emit('restartGame');
+        }
+        restartClicked = true;
+      }
       //game stuff
       var pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
       /*
@@ -241,12 +280,15 @@
       socket.on('viewLayer', function(data){
         if(data)
         {
-          view.sec = data.secs;
-          view.mins = data.mins;
-          view.playerScaore = data.playerScore;
+          view.playerScore = data.playerScore;
           view.multiplier = data.multiplier;
           patientHealth = data.patientHealth;
         }
+      });
+      socket.on('gameOver', function(){
+        clearInterval(myInterval);
+        console.log("game over socket:" + socket.id);
+        postGame();
       });       
       
 /*

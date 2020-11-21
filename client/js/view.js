@@ -14,39 +14,33 @@ makeUILayer : function()
   view.uiContext = view.uiCanvas.getContext('2d');        //context for that canvas
 }
 ,
-/*
 updateUI : function()                                     //MOVE TO SERVER, send info to clients
 {
-  if(!endGame())                                          //while game isnt over, update game time, score and multplier
-  {
-    view.updateTimer();
-    if(view.displayedScore < view.playerScore){view.displayedScore++;}
-    if(view.multiplier >= 9){view.multiplier = 9;}        //cap multiplier at 9
-  }
-  else{view.resetMultiplier();}  
+  view.updateTimer();
+  if(view.displayedScore < view.playerScore){view.displayedScore++;}
+  if(view.multiplier >= 9){view.multiplier = 9;}        //cap multiplier at 9
   view.updateUIElements();
 }
 ,
 updateTimer : function()                                  //MOVE TO SERVER, send info to clients
 {
   view.ticks++;                                           //ticks each frame at 60fps
-  if(view.ticks >= 60)
+  if(view.ticks >= 50)
   {
     view.secs++;
     view.ticks = 0;
   }
   if(view.secs >= 60)                                         
   {
-    view.mins++;
-    if(spawnRate > 1){spawnRate--;}                       //temp difficulty increase for each minute played.
+    view.mins++;                     //temp difficulty increase for each minute played.
     view.secs=0;
   }
 }
-,*/
+,
 updateUIElements : function()                             //set up time played for display and then display UI elements
 {
-  var secDisplay;
-  var minDisplay;
+  var secsDisplay;
+  var minsDisplay;
   if(view.displayedScore < view.playerScore)
   {
     if((view.playerScore-view.displayedScore)>99){view.displayedScore+=10;}
@@ -107,11 +101,6 @@ scoreDisplay : function()                                 //set up score to be d
   
   return scoreDis;
 }
-/*,
-resetMultiplier : function()
-{
-  view.multiplier = 1;
-}*/
 };                                                      //updated from CSE322 to use for CSE4050
   
 

@@ -26,27 +26,23 @@ class Game
     this.patientHealth = 1000;                                      //health score metric for display
     this.randomizer;                                                //variable for randomizing various processes
     this.layerObjects = [];
-    this.bRunLoop = false;
-    this.bResetMultiplier = false;                             //TODO move to player object?
-    this.intervalTime = 20;
-    this.ticks = 0;                                                //tracks frames elapsed
-    this.secs = 0;                                                 //tracks seconds elapsed
-    this.mins = 0;                                                 //tracks minutes elapsed
+    this.gameOver = false;
+    this.intervalTime = 20;                                                 //tracks minutes elapsed
     this.playerScore = 0;                                          //player's actual score
-    this.displayedScore = 0;                                       //displayed score for score incrementation animation
-    this.multiplier = 1;                                           //score multiplier
+    this.displayedScore = 0;
+    this.zDifficultyMultiplier = 1;                                       //displayed score for score incrementation animation
+    this.multiplier = 1;
+    this.tick = 0;                                           //score multiplier
     this.pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
     this.viewPackage = {                                                //in game loop                                                //tracks frames elapsed
-      secs : 0,                                                 //tracks seconds elapsed
-      mins : 0,                                                 //tracks minutes elapsed
       playerScore : 0,                                          //player's actual score                                      //displayed score for score incrementation animation
       multiplier : 1,
+      patientHealth : 1000,
     };
 
     this.playerObjects.push(this.player);
 
     this.makeLayers(this.numCanvases);
-    console.log("game constructor complete");
   }
 
 
@@ -54,7 +50,6 @@ fire()                                           //dynamically create missile at
 {                                                         //refactor this out of game loop and into player object for multiplayer                        
   var spawn = new Game.Projectile(this.player.xPos+this.player.FirePointX, this.player.yPos+this.player.FirePointY, this.player.FirePointX*25, this.player.FirePointY*25, 10, 2);
   this.playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
-  console.log("projectile fired");
 }
 
 makeLayers(amount)                              //fills the canvasObjects array with empty arrays that will be
@@ -64,7 +59,7 @@ makeLayers(amount)                              //fills the canvasObjects array 
     var temp = [];
     this.layerObjects.push(temp);
   }
-  console.log("layers made");
+
 }
 spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)  //checks to see if new object will collide with existing objects in a given canvas layer
 {
@@ -117,7 +112,7 @@ spawner(objects)                                 //dynamically spawns objects us
     }
     var spawn = new Game.Entity(randomX, randomY, randomZ, ranXVel, ranYVel, ranZVel, ranSize, ranDensity);
     objects.push(spawn);                                  //create new gameplay object and place into in the array for that canvas based on z-position
-    console.log("object spawned " + spawn);
+
   }
 }
 
@@ -141,9 +136,8 @@ cleanUpOffScreen(objects)                     //checks if objects have strayed t
       if((obj.yPos-obj.scale)>768 && objects==this.layerObjects[this.numCanvases-1])
       {
         this.patientHealth -= obj.scale;                    //effects patient health score and resets multiplier
-        this.bResetMultiplier = true;                        //if object removed from past bottom of screen. (i.e. pathogen
-      }
-      else { this.bResetMultiplier = false; }                                                //will effect patient) need to adjust this for multiplayer
+        this.multiplier = 1;                        //if object removed from past bottom of screen. (i.e. pathogen
+      }                                               //will effect patient) need to adjust this for multiplayer
       objects.splice(i,1);                             //possibly continue use for combined multiplier
     }                                                  //and give each player their own multiplier in addition
   }
@@ -160,9 +154,8 @@ cleanUpWeapons()                              //removes player generated project
        (obj.yPos+100)<0)
     {
       this.playerObjects.splice(i,1);
-      this.bResetMultiplier = true;
+      this.multiplier = 1;
     }
-    else { this.bResetMultiplier = false; }
   }
 }
 
@@ -224,7 +217,7 @@ handleInput()                                           //KEEP ON SERVER SIDE IN
   }
   if(this.pressedKeys["m"]){ this.fire(); }
 }
-updateLoop(delta)                             //input parameter is amount of time which has passed during a given frame
+updateLoop(delta, zMultiplier)                             //input parameter is amount of time which has passed during a given frame
 {                                                      //which is then passed into the update function of each object in the game
   for(var i=0; i < this.playerObjects.length; i++)          
   {
@@ -236,7 +229,7 @@ updateLoop(delta)                             //input parameter is amount of tim
     var group = this.layerObjects[i];
     for(var j=0; j < group.length; j++)
     {
-      group[j].update(delta);
+      group[j].update(delta, zMultiplier);
     }  
   }
 }
@@ -363,7 +356,7 @@ playerCollision(objects)                          //detects collision between pl
               objects.push(spawn);
             }
           }
-          else{this.resetMultiplier()};                                                                         //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
+          else{this.multiplier = 1;}                                                                         //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
           if(obj2.scale<10){objects.splice(j,1);}
         }
       }
@@ -448,16 +441,16 @@ collisionLoop()                                         //sends each canvas laye
   }
 }
 
-endGame()                                              //checks conditions for game being over
-{                                                               //TODO adjust for multiplayer
+endGame()                                                             //checks conditions for game being over
+{                                                                     //TODO adjust for multiplayer
   var gameOver;
 
-  if(this.player.Health <= 0)                                        //game over if player hull is compromised
+  if(this.player.health <= 0)                                         //game over if player hull is compromised
   {
-    this.player.Health(0);
+    this.player.health = 0;
     gameOver = true;
   }
-  else if(this.patientHealth <= 0)                                   //game over if too many pathogens get past the player and infect the patient
+  else if(this.patientHealth <= 0)                                    //game over if too many pathogens get past the player and infect the patient
   {
     this.patientHealth = 0;
     gameOver = true;
@@ -472,43 +465,23 @@ endGame()                                              //checks conditions for g
 
   updateViewPackage()
   {
-    this.viewPackage.secs = this.secs;
-    this.viewPackage.mins = this.mins;
     this.viewPackage.playerScore = this.playerScore;
     this.viewPackage.multiplier = this.multiplier;
     this.viewPackage.patientHealth = this.patientHealth;
   }
   
-  update()                                     //MOVE TO SERVER, send info to clients
+  viewUpdate()                                     //MOVE TO SERVER, send info to clients
   {
     if(!this.endGame())                                          //while game isnt over, update game time, score and multplier
     {
-      this.updateTimer();
       if(this.multiplier >= 9){this.multiplier = 9;}        //cap multiplier at 9
     }
-    else{this.resetMultiplier();}
+    else
+    {
+      this.multiplier = 1;
+      this.gameOver = true;
+    }
     this.updateViewPackage();  
-  }
-  
-  updateTimer()                                  //MOVE TO SERVER, send info to clients
-  {
-    this.ticks++;                                           //ticks each frame at 60fps
-    if(this.ticks >= 25)                                    //adjust to however many frames per sec the loop is at
-    {
-      this.secs++;
-      this.ticks = 0;
-    }
-    if(this.secs >= 60)                                         
-    {
-      this.mins++;
-      if(this.spawnRate > 1){this.spawnRate--;}                       //temp difficulty increase for each minute played.
-      this.secs=0;
-    }
-  }
-  
-  resetMultiplier()
-  {
-    this.multiplier = 1;                                    //THIS NEED TO BE PART OF THE PLAYER EVENTUALLY
   }
 }  //updated from CSE322 to use for CSE4050
 
@@ -551,7 +524,7 @@ endGame()                                              //checks conditions for g
       this.context.fill();
     }
   
-    update(seconds)                                                                    //updates velocity and position of object 
+    update(seconds, zMultiplier)                                                                    //updates velocity and position of object 
     {
       if(this.xVel != 0){this.xVel*=0.999;}                                            //friction, slowing velocity in all directions over time
       if(this.yVel != 0){this.yVel*=0.999;}
@@ -559,7 +532,7 @@ endGame()                                              //checks conditions for g
       this.yVel += 0.1;                                                                //simulates blood flow, moving objects toward bottom screen
       this.xPos += this.xVel*seconds;                                                  //position updated by velocity during that frame
       this.yPos += this.yVel*seconds;                                                  //in each spatial direction
-      this.zPos += this.zVel*seconds;
+      this.zPos += this.zVel*seconds*zMultiplier;
     }
   };
   
@@ -692,6 +665,7 @@ endGame()                                              //checks conditions for g
         this.yPos=768-this.scale;
         this.yVel*=-0.5;
       }
+      if(this.isColliding){this.health--;}
     }
   }; 
 
@@ -700,6 +674,8 @@ var SOCKET_LIST = {};
 var GAME_LIST = {};
 var serverIntervalTime = 20;
 var connections = 0;
+var activeGames = 0;
+var MAX_CONNECTIONS = 10;
 //var USERS = {};
 //var DEBUG = true;
 /*
@@ -733,6 +709,7 @@ var io = require('socket.io')(serv,{});
 io.sockets.on('connection', function(socket){
   socket.id = Math.random();
   socket.gameCreated = false;
+  socket.gameOverSent = false;
   SOCKET_LIST[socket.id] = socket;
   console.log('socket connection');
   connections++;
@@ -768,23 +745,50 @@ io.sockets.on('connection', function(socket){
   PLAYER_LIST[socket.id] = player;
   console.log('new player created');
 */
-
+  function gameStartup()
+  {
+    var game = new Game;
+    GAME_LIST[socket.id] = game;
+    console.log("game instance running");
+    socket.gameCreated = true;
+    socket.emit("gameStarted");
+    activeGames++;
+    console.log(connections + " connections active");
+    console.log(activeGames + " games active");
+  }
   socket.on('disconnect', function(){
     delete SOCKET_LIST[socket.id];
     delete GAME_LIST[socket.id];
+    connections--;
+    activeGames--;
+    console.log("disconnection");
+    console.log(connections + " connections active");
+    console.log(activeGames + " games active");
   });
 
   socket.on('playerInput', function(data){   //socket paired automatically by socket io.  update pressedKeys variable of socket's game object here
-    GAME_LIST[socket.id].pressedKeys = data;
+  if(GAME_LIST[socket.id]){GAME_LIST[socket.id].pressedKeys = data;}
   });
 
   socket.on('startGame', function(){
-      var game = new Game;
-      GAME_LIST[socket.id] = game;
-      console.log("game running");
-      socket.gameCreated = true;
-      console.log(connections);
-    });
+    if(connections <= MAX_CONNECTIONS && !socket.gameCreated)
+    {  
+      gameStartup();
+    }
+    else
+    {
+      socket.emit('serverFull');
+    }
+  });
+
+  socket.on('restartGame', function(){
+    socket.gameCreated = false;
+    delete GAME_LIST[socket.id];
+    activeGames--;
+    socket.gameOverSent = false;
+    console.log("game restart");
+    gameStartup();
+  });
 
 });
     
@@ -795,32 +799,55 @@ io.sockets.on('connection', function(socket){
       if(socket.gameCreated)
       {
         var game = GAME_LIST[socket.id];
-
-        game.randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
-                                                              //TODO refactor into function. maybe move into cleanup loop    
-        game.cleanUpLoop();                                          //removes non-player objects from their arrays for gabage collection when off screen 
-  
-        game.spawnClock++
-                                                  //temporary spawner delay to increase difficulty
-        if(game.spawnClock==game.spawnRate)                               
+        if(!game.gameOver)
         {
-          game.spawnerLoop();                                        //loop that creates various game objects that are not the player
-          game.spawnClock = 0;                                       //nor a player missile
-        }
+          game.tick++;
 
-        game.handleInput();
+          if(game.tick == 3000)
+          {
+            game.zDifficultyMultiplier += 0.1;
+            if(game.spawnRate > 1)
+            {
+              game.spawnRate--;
+              game.zDifficultyMultiplier += 0.1;
+              console.log(game.spawnRate);
+              game.tick = 0;
+              game.spawnClock = 0;
+            }
+          }
+
+          game.randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
+                                                              //TODO refactor into function. maybe move into cleanup loop    
+          game.cleanUpLoop();                                          //removes non-player objects from their arrays for gabage collection when off screen 
+  
+          game.spawnClock++
+                                                  //temporary spawner delay to increase difficulty
+          if(game.spawnClock==game.spawnRate)                               
+          {
+            game.spawnerLoop();                                        //loop that creates various game objects that are not the player
+            game.spawnClock = 0;                                       //nor a player missile
+          }
+
+          game.handleInput();
                                                 //INPUT ON CLIENT. HANDLE INPUT EMITTED INPUT HERE
-        game.updateLoop(game.intervalTime/1000);                          //update of all game objects
+          game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);                          //update of all game objects
                                                               //TODO refactor collision process        
-        game.collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
+          game.collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
   
-        game.moveInZLoop();                                          //moves objects between canvas layers based on their z value
+          game.moveInZLoop();                                          //moves objects between canvas layers based on their z value
   
-        game.update();
+          game.viewUpdate();
 
-        socket.emit('playerLayer', game.playerObjects);
-        socket.emit('objectLayers', game.layerObjects);
-        socket.emit('viewLayer', game.viewPackage);                                                            //TRANSMIT DATA TO CLIENT
+          socket.emit('playerLayer', game.playerObjects);
+          socket.emit('objectLayers', game.layerObjects);
+          socket.emit('viewLayer', game.viewPackage);
+        }
+        else if(!socket.gameOverSent)
+        {
+          socket.emit('gameOver');
+          socket.gameOverSent = true;
+           //do game over stuff
+        }                                                           //TRANSMIT DATA TO CLIENT
       }
     }
   },serverIntervalTime);
