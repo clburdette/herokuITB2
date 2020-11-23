@@ -27,7 +27,7 @@ class Game
     this.randomizer;                                                //variable for randomizing various processes
     this.layerObjects = [];
     this.gameOver = false;
-    this.intervalTime = 20;                                                 //tracks minutes elapsed
+    this.intervalTime = 10;                                                 //tracks minutes elapsed
     this.playerScore = 0;                                          //player's actual score
     this.displayedScore = 0;
     this.zDifficultyMultiplier = 1;                                       //displayed score for score incrementation animation
@@ -672,7 +672,7 @@ endGame()                                                             //checks c
 
 var SOCKET_LIST = {};
 var GAME_LIST = {};
-var serverIntervalTime = 20;
+var serverIntervalTime = 10;
 var connections = 0;
 var activeGames = 0;
 var MAX_CONNECTIONS = 10;
@@ -803,7 +803,7 @@ io.sockets.on('connection', function(socket){
         {
           game.tick++;
 
-          if(game.tick == 3000)
+          if(game.tick >= 6000)
           {
             game.zDifficultyMultiplier += 0.1;
             if(game.spawnRate > 1)

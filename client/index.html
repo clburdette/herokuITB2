@@ -21,7 +21,10 @@
       var mins = 0;
       var serverAccept = false;
       var restartClicked = false;
-      var myInterval                                                 //player character object
+      var myInterval
+      var playerLayerReceived = false;
+      var keyDownCheck = false;
+      var mouseDownCheck = false;                                               
 
       //signin stuff
 /*
@@ -171,16 +174,31 @@
         playArea.makeWeaponsLayer();
         view.makeUILayer();
         document.getElementById("parent").removeEventListener('click', requestGameStart, false);    //change listeners for mouse input from menu to gameplay
-        document.getElementById("parent").style.cursor = "none";                            //no visible cursor
-        document.getElementById("parent").addEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);//MOVE TO CLIENT
-        document.getElementById("parent").addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
-        document.addEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
+        document.getElementById("parent").style.cursor = "none";                                    //no visible cursor
+        document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        //MOVE TO CLIENT
+        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);           //MOVE TO CLIENT
+        document.addEventListener('keydown', keyDownHandler, false);                                //MOVE TO CLIENT  
         document.addEventListener('keyup', keyUpHandler, false);
         myInterval = setInterval(gameLoop, intervalTime)
         function gameLoop(){
+              if(!mouseDownCheck)
+              { pressedKeys["m"] = false; }
               socket.emit('playerInput', pressedKeys);
+              mouseDownCheck = false;
               playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
               playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
+              if(!playerLayerReceived)
+              {
+                handleInput();
+                updatePlayer(player);
+                console.log("client side player update");
+              }
+              if(!objectLayerReceived)
+              {
+
+              }
+              playerLayerReceived = false;
+              objectLayerReceived = false;
               drawPlayer();
               for(var i=0; i < playerObjects.length; i++)                   
               {
@@ -216,6 +234,102 @@
               }
               view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
               view.updateUI();
+              playerLayerReceived = false;
+              objectLayerReceived = false;
+        }
+      }
+
+      function updatePlayer(object)
+      {
+        object.xVec = Math.sin(object.angle);                                           //calculate forward vector based on
+        object.yVec = Math.cos(object.angle);                                           //player character object's rotation
+        object.FirePointX=object.xVec*object.scale;                                       //calculate position of fire point
+        object.FirePointY=object.yVec*object.scale*(-1);                                  //based on forward vector    
+        if(object.xVel != 0){object.xVel*=0.99;}                                        //friction
+        if(object.yVel != 0){object.yVel*=0.99;}
+        object.yVel += 0.003;                                                         //effect of blood flow on players
+        var speedRatio = ((object.xVel*object.xVel)+(object.yVel*object.yVel))/object.MAX_MAG;
+        if(speedRatio>1)                                                            //cap forward speed to MAX_MAG
+        {
+          object.xVel/=speedRatio;
+          object.yVel/=speedRatio;
+        }
+        object.xPos+=object.xVel;                                                       //position updated by velocity
+        object.yPos+=object.yVel;
+        if(object.xPos<object.scale)                                                    //keeps player object in the play area
+        {
+          object.xPos=object.scale;
+          object.xVel*=-0.5;
+        }
+        if(object.xPos>1024-object.scale)
+        {
+          object.xPos=1024-object.scale;
+          object.xVel*=-0.5;
+        }
+        if(object.yPos<object.scale)
+        {
+          object.yPos=object.scale;
+          object.yVel*=-0.5;
+        }
+        if(object.yPos>768-object.scale)
+        {
+          object.yPos=768-object.scale;
+          object.yVel*=-0.5;
+        }
+      }
+
+      function handleInput()                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
+      {
+        if(!pressedKeys || pressedKeys == null)
+        { 
+          pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
+        }
+        if(pressedKeys["a"]&&pressedKeys["d"]&&pressedKeys["w"])         //forward no rotation when a,d,w pressed
+        {
+          player.xVel += 0.01*player.FirePointX;
+          player.yVel += 0.01*player.FirePointY;    
+        }
+        else if(pressedKeys["a"]&&pressedKeys["w"])                      //forward and rotate left when a,w pressed
+        {
+          player.angle -= 0.05;
+          player.xVel += 0.01*player.FirePointX;
+          player.yVel += 0.01*player.FirePointY; 
+        }                                 
+        else if(pressedKeys["d"]&&pressedKeys["w"])                      //forward and rotate right when d,w, pressed
+        {
+          player.angle += 0.05;
+          player.xVel += 0.01*player.FirePointX;
+          player.yVel += 0.01*player.FirePointY;
+        }
+        else if(pressedKeys["a"]&&pressedKeys["s"])                     //backward and rotate left when a,s, pressed
+        {
+          player.angle -= -0.02;
+          player.xVel -= 0.001*player.FirePointX;
+          player.yVel -= 0.001*player.FirePointY;
+        }                                                       
+        else if(pressedKeys["d"]&&pressedKeys["s"])                     //backward and rotate right when d,s, pressed
+        {
+          player.angle += 0.02;
+          player.xVel += 0.001*player.FirePointX;
+          player.yVel += 0.001*player.FirePointY; 
+        }                                                       
+        else if(pressedKeys["a"])                                       //rotate left when a only pressed
+        {
+          player.angle -= 0.1;
+        }
+        else if(pressedKeys["d"])                                       //rotate right when d only pressed
+        {
+          player.angle += 0.1;
+        }
+        else if(pressedKeys["s"])                                       //backward when s only pressed
+        {
+          player.xVel -= 0.001*player.FirePointX;
+          player.yVel -= 0.001*player.FirePointY;               
+        }
+        else if(pressedKeys["w"])                                       //forward when w only pressed
+        {
+          player.xVel += 0.01*player.FirePointX;
+          player.yVel += 0.01*player.FirePointY;             
         }
       }
 
@@ -264,7 +378,8 @@
         if(e.key == "a"){ pressedKeys["a"] = true; }
         else if(e.key == "d"){ pressedKeys["d"] = true; }
         else if(e.key == "s"){ pressedKeys["s"] = true; }
-        else if(e.key == "w"){ pressedKeys["w"] = true; }                                                    
+        else if(e.key == "w"){ pressedKeys["w"] = true; }
+        keyDownCheck = true;                                                    
       }
 
       socket.on('playerLayer', function(data){
@@ -272,10 +387,17 @@
         {
           playerObjects = data;
           player = playerObjects[0];
+          playerLayerReceived = true;
         }
+        else{playerLayerReceived = false;}
       });
       socket.on('objectLayers', function(data){
-        if(data){layerObjects = data;}
+        if(data)
+        {
+          layerObjects = data;
+          objectLayerReceived = true;
+        }
+        else{objectLayerReceived = false;}
       });
       socket.on('viewLayer', function(data){
         if(data)
@@ -284,6 +406,7 @@
           view.multiplier = data.multiplier;
           patientHealth = data.patientHealth;
         }
+        else{console.log("no view layer data in package");}
       });
       socket.on('gameOver', function(){
         clearInterval(myInterval);
