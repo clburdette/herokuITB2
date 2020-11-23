@@ -191,13 +191,27 @@
               {
                 handleInput();
                 updatePlayer(player);
+                for(var i = 1; i < playerObjects.length; i++)
+                {
+                  playerObjects[i].xPos += playerObjects[i].xVel*intervalTime/1000;        
+                  playerObjects[i].yPos += playerObjects[i].yVel*intervalTime/1000;
+                }
                 console.log("client side player update");
               }
+              playerLayerReceived = false;
               if(!objectLayerReceived)
               {
-
+                for(var i = 0; i < layerObjects.length; i++)
+                {
+                  if(layerObjects[i].xVel != 0){layerObjects[i].xVel*=0.999;}                                            //friction, slowing velocity in all directions over time
+                  if(layerObjects[i].yVel != 0){layerObjects[i].yVel*=0.999;}
+                  if(layerObjects[i].zVel != 0){layerObjects[i].zVel*=0.999;}	
+                  layerObjects[i].yVel += 0.1;                                                                //simulates blood flow, moving objects toward bottom screen
+                  layerObjects[i].xPos += layerObjects[i].xVel*intervalTime/1000;                                                  //position updated by velocity during that frame
+                  layerObjects[i].yPos += layerObjects[i].yVel*intervalTime/1000;                                                  //in each spatial direction
+                  layerObjects[i].zPos += layerObjects[i].zVel*intervalTime/1000;
+                }
               }
-              playerLayerReceived = false;
               objectLayerReceived = false;
               drawPlayer();
               for(var i=0; i < playerObjects.length; i++)                   

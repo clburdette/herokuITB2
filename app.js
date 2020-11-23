@@ -48,7 +48,7 @@ class Game
 
 fire()                                           //dynamically create missile at player's fire point in the direction of player's forward vector
 {                                                         //refactor this out of game loop and into player object for multiplayer                        
-  var spawn = new Game.Projectile(this.player.xPos+this.player.FirePointX, this.player.yPos+this.player.FirePointY, this.player.FirePointX*25, this.player.FirePointY*25, 10, 2);
+  var spawn = new Game.Projectile(this.player.xPos+this.player.FirePointX, this.player.yPos+this.player.FirePointY, this.player.FirePointX*30, this.player.FirePointY*30, 10, 2);
   this.playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
 }
 
