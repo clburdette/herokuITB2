@@ -197,7 +197,7 @@ handleInput()                                           //KEEP ON SERVER SIDE IN
   else if(this.pressedKeys["d"]&&this.pressedKeys["s"])                     //backward and rotate right when d,s, pressed
   {
     this.player.changeAngle(0.02);
-    this.player.changeVel(0.001*this.player.FirePointX,0.001*this.player.FirePointY); 
+    this.player.changeVel(-0.001*this.player.FirePointX,-0.001*this.player.FirePointY); 
   }                                                       
   else if(this.pressedKeys["a"])                                       //rotate left when a only pressed
   {
@@ -676,75 +676,74 @@ var serverIntervalTime = 20;
 var connections = 0;
 var activeGames = 0;
 var MAX_CONNECTIONS = 10;
-//var USERS = {};
-//var DEBUG = true;
-/*
-function loadLoginData()
-{
-  fs.fileRead('login.json', function(data2){
-  USERS = JSON.parse(data2);
-  console.log('data read from login file');
-})
-}
-var isValidPassword = function(data){
-  loadLoginData();
-  return USERS[data.username] === data.password;
-}
-var isUserNameTaken = function(data){
-  loadLoginData();
-  return USERS[data.name];
-}
-var addUser = function(data){
-  loadLoginData();
-  USERS[data.name] = data.password;
-  var temp = JSON.stringify(USERS, null, 2);
-  fs.writeFile('login.json', temp, function(err)
-  {
-    if(err){console.log(err);}
-    else{console.log('data written to login file');}
-  })
-}
-*/
+var DEBUG = false;
+
 var io = require('socket.io')(serv,{});
 io.sockets.on('connection', function(socket){
   socket.id = Math.random();
   socket.gameCreated = false;
   socket.gameOverSent = false;
+  var USERS;
   SOCKET_LIST[socket.id] = socket;
   console.log('socket connection');
   connections++;
+
 //create game object socket object is session object
 //put game object into game objects array by socket.id
 
-/*
   socket.on('signIn', function(data){
-    var valid; //placeholder
-    //validate sign in against database
-    if(valid)
-    {  
-      //create player
-      socket.emit('signInResponse', {success:true});
-    }
-    else{socket.emit('signInResponse', {success:false});}
-  })
 
-  socket.on('signUp'), function(data){
-    if(isUserNameTaken(data))
-    {
-      socket.emit('signupResponse', {success:false});
-    }
-    else
-    {
-      addUser(data);
-      socket.emit('singUpResponse', {success:true});
-    }
-  }
-*/
-/*
-  var player = Player(socket.id);
-  PLAYER_LIST[socket.id] = player;
-  console.log('new player created');
-*/
+    fs.readFile('./login.json', (err, data2) => {
+      if(err)
+      {
+        console.log("error reading file");
+      }
+      else
+      {
+        USERS = JSON.parse(data2);
+        console.log('data read from login file. id: ' + socket.id);
+      }
+      if(USERS[data.username] && USERS[data.username] === data.password)
+      {  
+        socket.emit('signInResponse', {success:true});
+      }
+      else{socket.emit('signInResponse', {success:false});}
+      USERS = {};
+    });
+  });
+
+  socket.on('signUp', function(data){
+    fs.readFile('./login.json', (err, data2) => {
+      if(err)
+      {
+        console.log("error reading file");       
+      }
+      else
+      {
+        USERS = JSON.parse(data2);
+        console.log('data read from login file. id: ' + socket.id);
+      }
+
+      if(USERS[data.username])
+      {
+        socket.emit('signUpResponse', {success:false});
+        USERS = {};
+      }
+      else
+      {
+        USERS[data.username] = data.password;
+        var temp = JSON.stringify(USERS, null, 2);
+        fs.writeFile('./login.json', temp, function(err)
+        {
+          if(err){console.log("error writing file");}
+          else{console.log('data written to login file. id: ' + socket.id);}
+          socket.emit('singUpResponse', {success:true});
+          USERS = {};
+        });
+      }
+    });
+  });
+
   function gameStartup()
   {
     var game = new Game;
@@ -758,9 +757,12 @@ io.sockets.on('connection', function(socket){
   }
   socket.on('disconnect', function(){
     delete SOCKET_LIST[socket.id];
-    delete GAME_LIST[socket.id];
     connections--;
-    activeGames--;
+    if(GAME_LIST[socket.id])
+    {
+      delete GAME_LIST[socket.id];
+      activeGames--;
+    }
     console.log("disconnection");
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
@@ -790,6 +792,21 @@ io.sockets.on('connection', function(socket){
     gameStartup();
   });
 
+  socket.on('sendMsgToServer', function(data){
+    var playerName = socket.id;
+    for(var i in SOCKET_LIST){
+      SOCKET_LIST[i].emit('addToChat', playerName + ': ' + data);
+    }
+  });
+
+
+  if(DEBUG)
+  {
+    socket.on('evalServer', function(data){
+    var res = eval(data);
+    socket.emit('evalAnswer', res);
+    });
+  }
 });
     
   setInterval(function(){
@@ -852,24 +869,7 @@ io.sockets.on('connection', function(socket){
     }
   },serverIntervalTime);
 
-/*
-  socket.on('sendMsgToServer', function(data){
-    var playerName = socket.id;
-    for(var i in SOCKET_LIST){
-      SOCKET_LIST[i].emit('addToChat', playerName + ': ' + data);
-    }
-  });
-*/
-/*
-  if(DEBUG)
-  {
-    socket.on('evalServer', function(data){
-    var res = eval(data);
-    socket.emit('evalAnswer', res);
-    });
-  }
-});
-*/
+
 
 
 
