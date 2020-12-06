@@ -865,37 +865,42 @@ io.sockets.on('connection', function(socket){
   });
 
   socket.on('disconnect', function(){
-    delete USER_LIST[socket.id];
-    if(GAME_LIST[socket.id])
+    if(!GAME_LIST[socket.id])
+    {
+      if(socket.currentSession)
+      {
+        //socket.currentSession.game.playerObjects.splice(1,1);
+        socket.currentSession.game.isTwoPlayerGame = false;
+        socket.currentSession.game.gameOver = true;
+        socket.currentSession.hasTwoPlayers = false;
+        socket.currentSession.player2 = null;
+        socket.currentSession.socket2 = null;
+        socket.currentSession.socket1.emit("sessionAbandoned");
+        console.log("player 2 dropped out");
+      }        
+    }
+    else
     {
       if(GAME_LIST[socket.id].isTwoPlayerGame)
       {
         SESSION_LIST[socket.id].socket2.emit("sessionHostDropped");
         delete GAME_LIST[socket.id];
         delete SESSION_LIST[socket.id];
+        console.log("2 player game deleted");
       }
       else
       {
         delete GAME_LIST[socket.id];
+        console.log("1 player game deleted");
       }
       activeGames--;
     }
-    else
-    {
-      if(socket.currentSession)
-      {
-        socket.currentSession.game.playerObjects.splice(1,1);
-        socket.currentSession.game.isTwoPlayerGame = false;
-        socket.currentSession.hasTwoPlayers = false;
-        socket.currentSession.player2 = null;
-        socket.currentSession.socket2 = null;
-        socket.currentSession.socket1.emit("sessionAbandoned");
-      }        
-    }
+    socket.gameOverSent = true;
     connections--;
     console.log("disconnection");
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
+    delete USER_LIST[socket.id];
     delete SOCKET_LIST[socket.id];
   });
 
