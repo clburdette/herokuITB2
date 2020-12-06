@@ -12,7 +12,8 @@ makeCanvasTags : function(amount)                          //create string conta
   }
   temp += '<canvas id="weapons" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+2).toString() +';"></canvas>"';
   temp += '<canvas id="player" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+3).toString() +';"></canvas>"';
-  temp += '<canvas id="UI" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+4).toString() +';"></canvas>"';
+  temp += '<canvas id="player2" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+4).toString() +';"></canvas>"';
+  temp += '<canvas id="UI" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+5).toString() +';"></canvas>"';
 
   document.getElementById("parent").innerHTML = temp;      //last 3 canvases are for player emitted projectiles, player character object(s), and user interface respectively
 }                                                          //TODO rename weapons canvas to projectiles for sake of continuity
@@ -53,6 +54,7 @@ clearCanvases : function()                                 //clears last frame's
   }
   playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
   playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
+  playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
   view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
 }
 ,
@@ -60,6 +62,12 @@ makePlayerLayer : function()
 {
   playArea.playerCanvas = document.getElementById("player");         //creates player canvas, context          
   playArea.playerContext = playArea.playerCanvas.getContext('2d');
+}
+,
+makePlayer2Layer : function()
+{
+  playArea.player2Canvas = document.getElementById("player2");         //creates player canvas, context          
+  playArea.player2Context = playArea.player2Canvas.getContext('2d');
 }
 ,
 makeWeaponsLayer : function()

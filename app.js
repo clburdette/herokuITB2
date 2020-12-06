@@ -1,4 +1,5 @@
 const { COPYFILE_FICLONE_FORCE } = require('constants');
+const { SERVFAIL } = require('dns');
 var express = require('express');
 var fs = require('fs');
 var app = express();
@@ -13,14 +14,30 @@ app.use('/client', express.static(__dirname + '/client'));
 serv.listen(process.env.PORT || 2000);
 console.log("server initialized");
 //from classes file
+
+class GameSession
+{
+  constructor(player1, socket1)
+  {
+    this.game = null;
+    this.player1 = player1;
+    this.socket1 = socket1;
+    this.player2 = null;
+    this.socket2 = null;
+    this.hasTwoPlayers = false;
+  }
+}
+
 class Game
 {
-  constructor()
+  constructor(playerPosX, playerPosY, isTwoPlayerGame)
   {
     this.numCanvases = 16;                                          //defines amount of layers among play area objects
     this.spawnClock = 0;                                            //temp variables to keep objects from spawning
-    this.spawnRate = 10;                                            //every frame, also increase difficulty
-    this.player = new Game.Player(512, 384, 0, 0, 20, 10000, 100);                                                    //player character object
+    this.spawnRate = 10;
+    this.isTwoPlayerGame = isTwoPlayerGame;                                          //every frame, also increase difficulty
+    this.player = new Game.Player(playerPosX, playerPosY, 0, 0, 20, 10000, 100);
+    this.player2 = null;                                                    //player character object
     this.playerObjects = [];                                        //array that holds player and all player-fired objects
     this.PLAYER_LIST = [];                                          //duplicated in TUT
     this.patientHealth = 1000;                                      //health score metric for display
@@ -28,14 +45,23 @@ class Game
     this.layerObjects = [];
     this.gameOver = false;
     this.intervalTime = 20;                                                 //tracks minutes elapsed
-    this.playerScore = 0;                                          //player's actual score
+    this.playerScore = 0;
+    this.playerScore2 = 0;                                         //player's actual score
     this.displayedScore = 0;
+    this.displayedScore2 = 0;
     this.zDifficultyMultiplier = 1;                                       //displayed score for score incrementation animation
     this.multiplier = 1;
+    this.multiplier2 = 1;
     this.tick = 0;                                           //score multiplier
-    this.pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};
-    this.viewPackage = {                                                //in game loop                                                //tracks frames elapsed
-      playerScore : 0,                                          //player's actual score                                      //displayed score for score incrementation animation
+    this.pressedKeys1 = {"a":false,"d":false,"s":false, "w":false, "m":false};
+    this.pressedKeys2 = {"a":false,"d":false,"s":false, "w":false, "m":false};
+    this.viewPackage = {                                        
+      playerScore : 0,                                          
+      multiplier : 1,
+      patientHealth : 1000,
+    };
+    this.viewPackage2 = {                                                
+      playerScore : 0,                                          
       multiplier : 1,
       patientHealth : 1000,
     };
@@ -46,9 +72,9 @@ class Game
   }
 
 
-fire()                                           //dynamically create missile at player's fire point in the direction of player's forward vector
+fire(owner)                                           //dynamically create missile at player's fire point in the direction of player's forward vector
 {                                                         //refactor this out of game loop and into player object for multiplayer                        
-  var spawn = new Game.Projectile(this.player.xPos+this.player.FirePointX, this.player.yPos+this.player.FirePointY, this.player.FirePointX*30, this.player.FirePointY*30, 10, 2);
+  var spawn = new Game.Projectile(owner.xPos+owner.FirePointX, owner.yPos+owner.FirePointY, owner.FirePointX*30, owner.FirePointY*30, 10, 2, owner);
   this.playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
 }
 
@@ -136,7 +162,8 @@ cleanUpOffScreen(objects)                     //checks if objects have strayed t
       if((obj.yPos-obj.scale)>768 && objects==this.layerObjects[this.numCanvases-1])
       {
         this.patientHealth -= obj.scale;                    //effects patient health score and resets multiplier
-        this.multiplier = 1;                        //if object removed from past bottom of screen. (i.e. pathogen
+        if(obj.owner == this.player){ this.multiplier = 1;}
+        else if(obj.owner == this.player2){ this.multiplier2 = 1;}                        //if object removed from past bottom of screen. (i.e. pathogen
       }                                               //will effect patient) need to adjust this for multiplayer
       objects.splice(i,1);                             //possibly continue use for combined multiplier
     }                                                  //and give each player their own multiplier in addition
@@ -145,7 +172,10 @@ cleanUpOffScreen(objects)                     //checks if objects have strayed t
 
 cleanUpWeapons()                              //removes player generated projectiles when too far off screen                       
 {                                                      //so they no longer update and can be garbage collected
-  for(var i=1; i < this.playerObjects.length; i++)              //Allows leeway so projectiles can strike partially off screen
+  var i;
+  if(this.isTwoPlayerGame){i = 2;}
+  else{i = 1;}
+  for(i; i < this.playerObjects.length; i++)              //Allows leeway so projectiles can strike partially off screen
   {                                                    //objects. rename to cleanUpProjectiles    
     var obj = this.playerObjects[i];
     if((obj.xPos-100)>1024||
@@ -153,8 +183,9 @@ cleanUpWeapons()                              //removes player generated project
        (obj.yPos-100)>768||
        (obj.yPos+100)<0)
     {
+      if(obj.owner == this.player){ this.multiplier = 1;}
+      else if(obj.owner == this.player2){ this.multiplier2 = 1;}
       this.playerObjects.splice(i,1);
-      this.multiplier = 1;
     }
   }
 }
@@ -169,54 +200,55 @@ cleanUpLoop()                                 //sends each canvas layer object a
   } 
 }
 
-handleInput()                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
+handleInput(keySet,playerToAccess)                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
 {
-  if(!this.pressedKeys || this.pressedKeys == null)
+  if(!keySet || keySet == null)
   { 
-    this.pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
+    keySet = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
   }
-  if(this.pressedKeys["a"]&&this.pressedKeys["d"]&&this.pressedKeys["w"])         //forward no rotation when a,d,w pressed
+  if(keySet["a"]&&keySet["d"]&&keySet["w"])         //forward no rotation when a,d,w pressed
   {
-    this.player.changeVel(0.01*this.player.FirePointX,0.01*this.player.FirePointY);    
+    playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);    
   }
-  else if(this.pressedKeys["a"]&&this.pressedKeys["w"])                      //forward and rotate left when a,w pressed
+  else if(keySet["a"]&&keySet["w"])                      //forward and rotate left when a,w pressed
   {
-    this.player.changeAngle(-0.05);
-    this.player.changeVel(0.01*this.player.FirePointX,0.01*this.player.FirePointY); 
+    playerToAccess.changeAngle(-0.05);
+    playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY); 
   }                                 
-  else if(this.pressedKeys["d"]&&this.pressedKeys["w"])                      //forward and rotate right when d,w, pressed
+  else if(keySet["d"]&&keySet["w"])                      //forward and rotate right when d,w, pressed
   {
-    this.player.changeAngle(0.05);
-    this.player.changeVel(0.01*this.player.FirePointX,0.01*this.player.FirePointY);
+    playerToAccess.changeAngle(0.05);
+    playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);
   }
-  else if(this.pressedKeys["a"]&&this.pressedKeys["s"])                     //backward and rotate left when a,s, pressed
+  else if(keySet["a"]&&keySet["s"])                     //backward and rotate left when a,s, pressed
   {
-    this.player.changeAngle(-0.02);
-    this.player.changeVel(-0.001*this.player.FirePointX,-0.001*this.player.FirePointY);
+    playerToAccess.changeAngle(-0.02);
+    playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY);
   }                                                       
-  else if(this.pressedKeys["d"]&&this.pressedKeys["s"])                     //backward and rotate right when d,s, pressed
+  else if(keySet["d"]&&keySet["s"])                     //backward and rotate right when d,s, pressed
   {
-    this.player.changeAngle(0.02);
-    this.player.changeVel(-0.001*this.player.FirePointX,-0.001*this.player.FirePointY); 
+    playerToAccess.changeAngle(0.02);
+    playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY); 
   }                                                       
-  else if(this.pressedKeys["a"])                                       //rotate left when a only pressed
+  else if(keySet["a"])                                       //rotate left when a only pressed
   {
-    this.player.changeAngle(-0.1);
+    playerToAccess.changeAngle(-0.1);
   }
-  else if(this.pressedKeys["d"])                                       //rotate right when d only pressed
+  else if(keySet["d"])                                       //rotate right when d only pressed
   {
-    this.player.changeAngle(0.1);
+    playerToAccess.changeAngle(0.1);
   }
-  else if(this.pressedKeys["s"])                                       //backward when s only pressed
+  else if(keySet["s"])                                       //backward when s only pressed
   {
-    this.player.changeVel(-0.001*this.player.FirePointX,-0.001*this.player.FirePointY)               
+    playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY)               
   }
-  else if(this.pressedKeys["w"])                                       //forward when w only pressed
+  else if(keySet["w"])                                       //forward when w only pressed
   {
-    this.player.changeVel(0.01*this.player.FirePointX,0.01*this.player.FirePointY);             
+    playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);             
   }
-  if(this.pressedKeys["m"]){ this.fire(); }
+  if(keySet["m"]){ this.fire(playerToAccess); }
 }
+
 updateLoop(delta, zMultiplier)                             //input parameter is amount of time which has passed during a given frame
 {                                                      //which is then passed into the update function of each object in the game
   for(var i=0; i < this.playerObjects.length; i++)          
@@ -326,8 +358,7 @@ playerCollision(objects)                          //detects collision between pl
           obj1.xVel -= (impulse*obj2.scale*obj2.density*vNorm.x);
           obj1.yVel -= (impulse*obj2.scale*obj2.density*vNorm.y);
           obj2.xVel += (impulse*obj1.scale*obj1.density*vNorm.x);
-          obj2.yVel += (impulse*obj1.scale*obj1.density*vNorm.y);
-          if(!this.endGame()){this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;}                       //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
+          obj2.yVel += (impulse*obj1.scale*obj1.density*vNorm.y);                     
           obj2.scale-=obj1.scale;
           if(sqDistance/(Math.pow(obj1.scale + obj2.scale,2)) < 0.9)
           {
@@ -341,23 +372,57 @@ playerCollision(objects)                          //detects collision between pl
             obj2.xVel += (vecTwo.x/obj2.scale)*1000;
             obj2.yVel += (vecTwo.y/obj2.scale)*1000;
           }
-          if(i>0)
+          if(this.isTwoPlayerGame)
           {
-            this.multiplier++;                                                                                   //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
-            this.playerObjects.splice(i,1);
-            if(obj2.scale > 60)
+            if(i>1)
             {
-              var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-              var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-              var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-              var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-              var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
-              obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
-              objects.push(spawn);
+              if(!this.endGame())
+              {
+                if(this.playerObjects[i].owner == this.player){this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;}
+                else if(this.playerObjects[i].owner == this.player2){this.playerScore2 += Math.ceil(1000/obj2.scale) * this.multiplier2;}
+              }
+              if(this.playerObjects[i].owner == this.player){this.multiplier++;}
+              else if(this.playerObjects[i].owner == this.player2){this.multiplier2++;}                                                                                  //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
+              this.playerObjects.splice(i,1);
+              if(obj2.scale > 60)
+              {
+                var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
+                obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
+                objects.push(spawn);
+              }
             }
+            else if( i == 0 ){this.multiplier = 1;}
+            else if( i == 1 ){this.multiplier2 = 1;}                                                                         //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
+            if(obj2.scale<10){objects.splice(j,1);}
           }
-          else{this.multiplier = 1;}                                                                         //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
-          if(obj2.scale<10){objects.splice(j,1);}
+          else
+          {
+            if(i>0)
+            {
+              if(!this.endGame())
+              {
+                this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;
+                this.multiplier++;
+              }                                                                                 //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
+              this.playerObjects.splice(i,1);
+              if(obj2.scale > 60)
+              {
+                var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
+                obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
+                objects.push(spawn);
+              }
+            }
+            if( i == 0 ){this.multiplier = 1;}                                                                       //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
+            if(obj2.scale<10){objects.splice(j,1);}
+          }
         }
       }
     }
@@ -468,17 +533,22 @@ endGame()                                                             //checks c
     this.viewPackage.playerScore = this.playerScore;
     this.viewPackage.multiplier = this.multiplier;
     this.viewPackage.patientHealth = this.patientHealth;
+    this.viewPackage2.playerScore = this.playerScore2;
+    this.viewPackage2.multiplier = this.multiplier2;
+    this.viewPackage2.patientHealth = this.patientHealth;
   }
   
   viewUpdate()                                     //MOVE TO SERVER, send info to clients
   {
     if(!this.endGame())                                          //while game isnt over, update game time, score and multplier
     {
-      if(this.multiplier >= 9){this.multiplier = 9;}        //cap multiplier at 9
+      if(this.multiplier >= 9){this.multiplier = 9;}
+      if(this.multiplier2 >= 9){this.multiplier2 = 9;}           //cap multiplier at 9
     }
     else
     {
       this.multiplier = 1;
+      this.multiplier2 = 1;
       this.gameOver = true;
     }
     this.updateViewPackage();  
@@ -539,7 +609,7 @@ endGame()                                                             //checks c
   Game.Projectile = class                                                                     //emitted object which does not collide with players
   {                                                                                    //and only operates within one canvas. no Z-movement.
                                                                                        //TODO need to move draw function to client
-    constructor(xPos, yPos, xVel, yVel, scale, density)
+    constructor(xPos, yPos, xVel, yVel, scale, density, owner)
     {
       this.xPos=xPos;
       this.yPos=yPos;
@@ -547,6 +617,7 @@ endGame()                                                             //checks c
       this.yVel=yVel;
       this.scale=scale;
       this.density=density;
+      this.owner = owner;
     }
   
     draw()
@@ -671,10 +742,13 @@ endGame()                                                             //checks c
 
 
 var SOCKET_LIST = {};
+var USER_LIST = {};
 var GAME_LIST = {};
+var SESSION_LIST = {};
 var serverIntervalTime = 20;
 var connections = 0;
 var activeGames = 0;
+var twoPlayerOpenings = 0;
 var MAX_CONNECTIONS = 10;
 var DEBUG = false;
 
@@ -682,7 +756,11 @@ var io = require('socket.io')(serv,{});
 io.sockets.on('connection', function(socket){
   socket.id = Math.random();
   socket.gameCreated = false;
+  socket.hostingSession = false;
   socket.gameOverSent = false;
+  socket.inTwoPlayerGame = false;
+  socket.currentSession = null;
+  socket.playerID = "";
   var USERS;
   SOCKET_LIST[socket.id] = socket;
   console.log('socket connection');
@@ -705,6 +783,8 @@ io.sockets.on('connection', function(socket){
       }
       if(USERS[data.username] && USERS[data.username] === data.password)
       {  
+        socket.playerID = data.username;
+        USER_LIST[socket.id] = socket.playerID;
         socket.emit('signInResponse', {success:true});
       }
       else{socket.emit('signInResponse', {success:false});}
@@ -746,7 +826,7 @@ io.sockets.on('connection', function(socket){
 
   function gameStartup()
   {
-    var game = new Game;
+    var game = new Game(512, 384, false);
     GAME_LIST[socket.id] = game;
     console.log("game instance running");
     socket.gameCreated = true;
@@ -755,21 +835,86 @@ io.sockets.on('connection', function(socket){
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
   }
-  socket.on('disconnect', function(){
-    delete SOCKET_LIST[socket.id];
-    connections--;
-    if(GAME_LIST[socket.id])
-    {
-      delete GAME_LIST[socket.id];
-      activeGames--;
-    }
-    console.log("disconnection");
+
+  function twoPlayerSessionStartup()
+  {
+    var hostedSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
+    SESSION_LIST[socket.id] = hostedSession;
+    console.log("game session created");
+    socket.currentSession = hostedSession;
+    socket.hostingSession = true;
+    socket.emit("twoPlayerSessionStarted");
+    twoPlayerOpenings++;
+    console.log(connections + " connections active");
+    console.log(activeGames + " games active");
+  }
+
+  socket.on("sessionReset", function(){
+    socket.gameCreated = false;
+    delete GAME_LIST[socket.id];
+    activeGames--;
+    socket.gameOverSent = false;
+    socket.inTwoPlayerGame = false;
+    console.log("game ended");
+    delete SESSION_LIST[socket.id];
+    socket.hostingSession = false;
+    socket.currentSession = null;
+    console.log("session ended");
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
   });
 
+  socket.on('disconnect', function(){
+    delete USER_LIST[socket.id];
+    if(GAME_LIST[socket.id])
+    {
+      if(GAME_LIST[socket.id].isTwoPlayerGame)
+      {
+        SESSION_LIST[socket.id].socket2.emit("sessionHostDropped");
+        delete GAME_LIST[socket.id];
+        delete SESSION_LIST[socket.id];
+      }
+      else
+      {
+        delete GAME_LIST[socket.id];
+      }
+      activeGames--;
+    }
+    else
+    {
+      if(socket.currentSession)
+      {
+        socket.currentSession.game.playerObjects.splice(1,1);
+        socket.currentSession.game.isTwoPlayerGame = false;
+        socket.currentSession.hasTwoPlayers = false;
+        socket.currentSession.player2 = null;
+        socket.currentSession.socket2 = null;
+        socket.currentSession.socket1.emit("sessionAbandoned");
+      }        
+    }
+    connections--;
+    console.log("disconnection");
+    console.log(connections + " connections active");
+    console.log(activeGames + " games active");
+    delete SOCKET_LIST[socket.id];
+  });
+
   socket.on('playerInput', function(data){   //socket paired automatically by socket io.  update pressedKeys variable of socket's game object here
-  if(GAME_LIST[socket.id]){GAME_LIST[socket.id].pressedKeys = data;}
+    if(socket.inTwoPlayerGame)
+    {
+      if(socket.hostingSession)
+      {
+        GAME_LIST[socket.id].pressedKeys1 = data;
+      }
+      else
+      {
+        socket.currentSession.game.pressedKeys2 = data;
+      }
+    }
+    else
+    {
+      if(GAME_LIST[socket.id]){GAME_LIST[socket.id].pressedKeys1 = data;}
+    }
   });
 
   socket.on('startGame', function(){
@@ -783,13 +928,64 @@ io.sockets.on('connection', function(socket){
     }
   });
 
-  socket.on('restartGame', function(){
+  socket.on('startTwoPlayerGame', function(){
+    if(connections <= MAX_CONNECTIONS && !socket.gameCreated)
+    {  
+      if(twoPlayerOpenings == 0)
+      {
+        twoPlayerSessionStartup();
+      }
+      else
+      {
+        var tempSession;
+        for(var i in SESSION_LIST)
+        {
+          if(SESSION_LIST[i] && !SESSION_LIST[i].hasTwoPlayers)
+          {
+            SESSION_LIST[i].game = new Game( 340, 384, true);
+            SESSION_LIST[i].game.player2 = new Game.Player(684, 384, 0, 0, 20, 10000, 100);
+            SESSION_LIST[i].game.playerObjects.push(SESSION_LIST[i].game.player2);
+            SESSION_LIST[i].game.isTwoPlayerGame = true;
+            SESSION_LIST[i].hasTwoPlayers = true;
+            SESSION_LIST[i].player2 = USER_LIST[socket.id];
+            SESSION_LIST[i].socket2 = SOCKET_LIST[socket.id];
+            GAME_LIST[SESSION_LIST[i].socket1.id] = SESSION_LIST[i].game
+            SESSION_LIST[i].socket1.gameCreated = true;
+            tempSession = SESSION_LIST[i];
+            break;
+          }
+        }
+        twoPlayerOpenings--;
+        tempSession.socket1.emit('twoPlayerGameStarted');
+        tempSession.socket1.inTwoPlayerGame = true;
+        tempSession.socket2.emit('twoPlayerGameStarted');
+        tempSession.socket2.inTwoPlayerGame = true;
+        tempSession.socket2.currentSession = tempSession;
+        activeGames++;
+        socket.inTwoPlayerGame = true;
+        console.log(activeGames + " games active");
+      }                                                             
+    }
+    else
+    {
+      socket.emit('serverFull2');
+    }
+  });
+
+  socket.on('endGame', function(){
+    if(socket.gameCreated)
+    {
+      delete GAME_LIST[socket.id];
+      activeGames--;
+      console.log("game ended");
+    }
     socket.gameCreated = false;
-    delete GAME_LIST[socket.id];
-    activeGames--;
+    socket.hostingSession = false;
     socket.gameOverSent = false;
-    console.log("game restart");
-    gameStartup();
+    socket.inTwoPlayerGame = false;
+    socket.currentSession = null;
+    console.log(connections + " connections active");
+    console.log(activeGames + " games active");
   });
 
   socket.on('sendMsgToServer', function(data){
@@ -844,9 +1040,9 @@ io.sockets.on('connection', function(socket){
             game.spawnerLoop();                                        //loop that creates various game objects that are not the player
             game.spawnClock = 0;                                       //nor a player missile
           }
+          game.handleInput(game.pressedKeys1,game.player);
+          if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}       //LEFT OFF HERE!!!
 
-          game.handleInput();
-                                                //INPUT ON CLIENT. HANDLE INPUT EMITTED INPUT HERE
           game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);                          //update of all game objects
                                                               //TODO refactor collision process        
           game.collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
@@ -858,10 +1054,17 @@ io.sockets.on('connection', function(socket){
           socket.emit('playerLayer', game.playerObjects);
           socket.emit('objectLayers', game.layerObjects);
           socket.emit('viewLayer', game.viewPackage);
+          if(game.isTwoPlayerGame)
+          {
+            SESSION_LIST[socket.id].socket2.emit('playerLayer', game.playerObjects);
+            SESSION_LIST[socket.id].socket2.emit('objectLayers', game.layerObjects);
+            SESSION_LIST[socket.id].socket2.emit('viewLayer', game.viewPackage2);
+          }
         }
         else if(!socket.gameOverSent)
         {
           socket.emit('gameOver');
+          if(game.isTwoPlayerGame){SESSION_LIST[socket.id].socket2.emit('gameOver');}
           socket.gameOverSent = true;
            //do game over stuff
         }                                                           //TRANSMIT DATA TO CLIENT

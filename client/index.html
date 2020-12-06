@@ -7,12 +7,13 @@
     <script type="text/javascript" src="/client/js/playArea.js"></script>
     <script type="text/javascript" src="/client/js/view.js"></script>
     <script>
-      var socket = io();                                             //TODO   FIX reversed layer object colors 
-      var numCanvases = 16;                                          //TODO   FIX multiplier
-      var canvasBag = [];                                            //TODO   FIX hull and score issues
+      var socket = io();                                              
+      var numCanvases = 16;                                          
+      var canvasBag = [];                                            
       var contextBag = [];                                           //TODO   address sluggishness and framerate
       var layerObjects = [];                                         
       var player;
+      var player2;
       var playerObjects = [];                                        
       var patientHealth = 1000;
       var intervalTime = 20;
@@ -20,7 +21,8 @@
       var secs = 0;
       var mins = 0;
       var serverAccept = false;
-      var restartClicked = false;
+      var server2init = false;
+      var serverAccept2 = false;
       var myInterval
       var playerLayerReceived = false;
       var keyDownCheck = false;
@@ -29,31 +31,32 @@
 
       //signin stuff
     
-      function drawPlayer()
+      function drawPlayer(context, player)
       {
-        playArea.playerContext.save();
-        playArea.playerContext.translate(player.xPos, player.yPos);                               //move player canvas to new position
-        playArea.playerContext.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
-        playArea.playerContext.beginPath();                                                   //TODO only draw when player is imparting thrust
-        playArea.playerContext.arc(player.FirePointX/-2, player.FirePointY/-2, 14, 0, 2*Math.PI);
-        playArea.playerContext.fill();
-        playArea.playerContext.fillStyle = '#0000FF';                                         //draw player fire point graphic
-        playArea.playerContext.beginPath();
-        playArea.playerContext.arc(player.FirePointX, player.FirePointY, 4, 0, 2*Math.PI);
-        playArea.playerContext.fill();
-        playArea.playerContext.rotate(player.angle);                                            //rotate canvas to the player's rotation 
-        playArea.playerContext.fillStyle = '#00FF00';                                         //draw main body of player object
-        playArea.playerContext.beginPath();                                                   //canvas is translated and rotated. player object
-        playArea.playerContext.arc(0, 0, player.scale, 0, 2*Math.PI);                           //is rendered normally to make the player object
-        playArea.playerContext.fill();                                                        //appear to translate and rotate relative to
+        var playerContext = context;
+        playerContext.save();
+        playerContext.translate(player.xPos, player.yPos);                               //move player canvas to new position
+        playerContext.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
+        playerContext.beginPath();                                                   //TODO only draw when player is imparting thrust
+        playerContext.arc(player.FirePointX/-2, player.FirePointY/-2, 14, 0, 2*Math.PI);
+        playerContext.fill();
+        playerContext.fillStyle = '#0000FF';                                         //draw player fire point graphic
+        playerContext.beginPath();
+        playerContext.arc(player.FirePointX, player.FirePointY, 4, 0, 2*Math.PI);
+        playerContext.fill();
+        playerContext.rotate(player.angle);                                            //rotate canvas to the player's rotation 
+        playerContext.fillStyle = '#00FF00';                                         //draw main body of player object
+        playerContext.beginPath();                                                   //canvas is translated and rotated. player object
+        playerContext.arc(0, 0, player.scale, 0, 2*Math.PI);                           //is rendered normally to make the player object
+        playerContext.fill();                                                        //appear to translate and rotate relative to
         if(player.isColliding)                                                        //player view
           {
-              playArea.playerContext.fillStyle = '#FF0000';                                       //recolors player object on collision to indicate
-              playArea.playerContext.beginPath();                                                 //to the player that a collision has occurred
-              playArea.playerContext.arc(0, 0, this.scale, 0, 2*Math.PI);     
-              playArea.playerContext.fill();
+              playerContext.fillStyle = '#FF0000';                                       //recolors player object on collision to indicate
+              playerContext.beginPath();                                                 //to the player that a collision has occurred
+              playerContext.arc(0, 0, this.scale, 0, 2*Math.PI);     
+              playerContext.fill();
           }
-        playArea.playerContext.restore();
+        playerContext.restore();
       }
 
       function init()                                                //game intro screen
@@ -86,9 +89,11 @@
         introTxt += "Left Click - fire<br>";
         introTxt += "keep your mouse in the play area!<br><br>";
         introTxt += "</div><br>";
-        introTxt += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to start</div>";
+        introTxt += "<div><div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here for 1 player</div>";
+        introTxt += "<div id='tempStart2' style='text-align: center; width: 15%; background-color: orange; margin: auto;'>click here for 2 player</div></div>";
         document.getElementById("parent").innerHTML = introTxt;                           //display intro text in div found in index  
         document.getElementById("tempStart").addEventListener('click', requestGameStart, false);
+        document.getElementById("tempStart2").addEventListener('click', requestTwoPlayerGameStart, false);
         console.log("init page loaded");
           //initialize game when start is clicked
       }
@@ -107,32 +112,75 @@
         }
       }
 
+      function requestTwoPlayerGameStart()
+      {
+        if(!serverAccept2)
+        {
+          socket.emit('startTwoPlayerGame');
+          console.log("start two player game request sent");
+        }
+        else
+        {
+          console.log("game start error");
+          document.getElementById("parent").innerHTML = "an error occurred. please reload this page.";
+        }
+      }
+      
       socket.on("gameStarted", function(){
         serverAccept = true;
-        restartClicked - false;
         initGame();
+      });
+
+      socket.on("twoPlayerSessionStarted", function(){
+        server2init = true;
+        document.getElementById("parent").innerHTML = "game session started. waiting for 2nd player";
+      });
+
+      socket.on("twoPlayerGameStarted", function(){
+        serverAccept2 = true;
+        initGame()
       });
 
       socket.on("serverFull", function(){
         document.getElementById("parent").innerHTML = "server full. please wait for game to start";
         requestGameStart();
       });
+
+      socket.on("serverFull2", function(){
+        document.getElementById("parent").innerHTML = "server full. please wait for game to start";
+        requestTwoPlayerGameStart();
+      });
+
+      socket.on("sessionHostDropped", function(){
+        serverAccept2 = false;
+        clearInterval(myInterval);
+        console.log("game over socket:" + socket.id);
+        postGame();
+      });
+
+      socket.on("sessionAbandoned", function(){
+        serverAccept2 = false;
+        clearInterval(myInterval);
+        console.log("game over socket:" + socket.id);
+        postGame();
+      });
   
       function initGame()                                          //creates conditions necessary for building the game
       { 
-        console.log("initGame function accessed");                                                           //MOVE TO CLIENT  
+        console.log("initGame function accessed");                                                           
         playArea.makeCanvasTags(numCanvases);                      //makes all the canvases and arrays to hold canvas drawn  
         playArea.makeCanvases(numCanvases);                        //objects of an amount which is a power of 2
         playArea.makeContexts(numCanvases);                        //due to the way color transitions are handled
         playArea.linkContexts(numCanvases);                                
         playArea.makePlayerLayer();
+        playArea.makePlayer2Layer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();
         document.getElementById("parent").removeEventListener('click', requestGameStart, false);    //change listeners for mouse input from menu to gameplay
         document.getElementById("parent").style.cursor = "none";                                    //no visible cursor
-        document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        //MOVE TO CLIENT
-        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);           //MOVE TO CLIENT
-        document.addEventListener('keydown', keyDownHandler, false);                                //MOVE TO CLIENT  
+        document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        
+        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);          
+        document.addEventListener('keydown', keyDownHandler, false);                                 
         document.addEventListener('keyup', keyUpHandler, false);
         myInterval = setInterval(gameLoop, intervalTime)
         function gameLoop(){
@@ -142,11 +190,19 @@
               mouseDownCheck = false;
               playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
               playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
+              playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
               if(!playerLayerReceived)
               {
-                handleInput();
+                var i = 1;
+                if(!server2init && serverAccept2){handleInput(player2);}
+                else{handleInput(player);}
                 updatePlayer(player);
-                for(var i = 1; i < playerObjects.length; i++)
+                if(serverAccept2)
+                {
+                  updatePlayer(player2);
+                  i = 2;
+                }
+                for(i; i < playerObjects.length; i++)
                 {
                   playerObjects[i].xPos += playerObjects[i].xVel*intervalTime/1000;        
                   playerObjects[i].yPos += playerObjects[i].yVel*intervalTime/1000;
@@ -168,16 +224,22 @@
                 }
               }
               objectLayerReceived = false;
-              drawPlayer();
-              for(var i=0; i < playerObjects.length; i++)                   
+              drawPlayer(playArea.playerContext, player);
+              var m = 1;
+              if(serverAccept2)
+              {
+                drawPlayer(playArea.player2Context, player2);
+                m = 2;
+              }
+              for(m; m < playerObjects.length; m++)                   
               {
                 playArea.weaponsContext.fillStyle = '#000000';                  
                 playArea.weaponsContext.beginPath();
-                playArea.weaponsContext.arc(playerObjects[i].xPos, playerObjects[i].yPos, playerObjects[i].scale, 0, 2*Math.PI);     
+                playArea.weaponsContext.arc(playerObjects[m].xPos, playerObjects[m].yPos, playerObjects[m].scale, 0, 2*Math.PI);     
                 playArea.weaponsContext.fill();
               }                    
 
-              for(i=0; i < contextBag.length; i++)
+              for(var i = 0; i < contextBag.length; i++)
               {
                   contextBag[i].clearRect(0,0,canvasBag[i].width,canvasBag[i].height);
               }
@@ -247,7 +309,7 @@
         }
       }
 
-      function handleInput()                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
+      function handleInput(targetplayer)                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
       {
         if(!pressedKeys || pressedKeys == null)
         { 
@@ -255,50 +317,50 @@
         }
         if(pressedKeys["a"]&&pressedKeys["d"]&&pressedKeys["w"])         //forward no rotation when a,d,w pressed
         {
-          player.xVel += 0.01*player.FirePointX;
-          player.yVel += 0.01*player.FirePointY;    
+          targetplayer.xVel += 0.01*targetplayer.FirePointX;
+          targetplayer.yVel += 0.01*targetplayer.FirePointY;    
         }
         else if(pressedKeys["a"]&&pressedKeys["w"])                      //forward and rotate left when a,w pressed
         {
-          player.angle -= 0.05;
-          player.xVel += 0.01*player.FirePointX;
-          player.yVel += 0.01*player.FirePointY; 
+          targetplayer.angle -= 0.05;
+          targetplayer.xVel += 0.01*targetplayer.FirePointX;
+          targetplayer.yVel += 0.01*targetplayer.FirePointY; 
         }                                 
         else if(pressedKeys["d"]&&pressedKeys["w"])                      //forward and rotate right when d,w, pressed
         {
-          player.angle += 0.05;
-          player.xVel += 0.01*player.FirePointX;
-          player.yVel += 0.01*player.FirePointY;
+          targetplayer.angle += 0.05;
+          targetplayer.xVel += 0.01*targetplayer.FirePointX;
+          targetplayer.yVel += 0.01*targetplayer.FirePointY;
         }
         else if(pressedKeys["a"]&&pressedKeys["s"])                     //backward and rotate left when a,s, pressed
         {
-          player.angle -= -0.02;
-          player.xVel -= 0.001*player.FirePointX;
-          player.yVel -= 0.001*player.FirePointY;
+          targetplayer.angle -= -0.02;
+          targetplayer.xVel -= 0.001*targetplayer.FirePointX;
+          targetplayer.yVel -= 0.001*targetplayer.FirePointY;
         }                                                       
         else if(pressedKeys["d"]&&pressedKeys["s"])                     //backward and rotate right when d,s, pressed
         {
-          player.angle += 0.02;
-          player.xVel += 0.001*player.FirePointX;
-          player.yVel += 0.001*player.FirePointY; 
+          targetplayer.angle += 0.02;
+          targetplayer.xVel += 0.001*targetplayer.FirePointX;
+          targetplayer.yVel += 0.001*targetplayer.FirePointY; 
         }                                                       
         else if(pressedKeys["a"])                                       //rotate left when a only pressed
         {
-          player.angle -= 0.1;
+          targetplayer.angle -= 0.1;
         }
         else if(pressedKeys["d"])                                       //rotate right when d only pressed
         {
-          player.angle += 0.1;
+          targetplayer.angle += 0.1;
         }
         else if(pressedKeys["s"])                                       //backward when s only pressed
         {
-          player.xVel -= 0.001*player.FirePointX;
-          player.yVel -= 0.001*player.FirePointY;               
+          targetplayer.xVel -= 0.001*targetplayer.FirePointX;
+          targetplayer.yVel -= 0.001*targetplayer.FirePointY;               
         }
         else if(pressedKeys["w"])                                       //forward when w only pressed
         {
-          player.xVel += 0.01*player.FirePointX;
-          player.yVel += 0.01*player.FirePointY;             
+          targetplayer.xVel += 0.01*targetplayer.FirePointX;
+          targetplayer.yVel += 0.01*targetplayer.FirePointY;             
         }
       }
 
@@ -306,9 +368,9 @@
       {
         var postText = "";
         document.getElementById("parent").style.cursor = "auto";                            //no visible cursor
-        document.getElementById("parent").removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);//MOVE TO CLIENT
-        document.getElementById("parent").removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);//MOVE TO CLIENT
-        document.removeEventListener('keydown', keyDownHandler, false);                             //MOVE TO CLIENT  
+        document.getElementById("parent").removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);
+        document.getElementById("parent").removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);
+        document.removeEventListener('keydown', keyDownHandler, false);                            
         document.removeEventListener('keyup', keyUpHandler, false);
         postText += "<div style='text-align: center; width: 100%'>You Lose!</div>";
         postText += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to restart</div>"
@@ -319,12 +381,11 @@
 
       function restartGame()
       {
-        if(!restartClicked)
-        {
           document.getElementById("tempStart").removeEventListener('click', restartGame, false);
-          socket.emit('restartGame');
-        }
-        restartClicked = true;
+          if(server2init){socket.emit("sessionReset")}
+          else{socket.emit('endGame');}
+          server2init = false;
+          init();
       }
       //game stuff
 
@@ -350,6 +411,7 @@
         {
           playerObjects = data;
           player = playerObjects[0];
+          if(serverAccept2){player2 = playerObjects[1];}
           playerLayerReceived = true;
         }
         else{playerLayerReceived = false;}
@@ -459,6 +521,7 @@
       socket.on('addToChat', function(data){
         chat.innerHTML =+ '<div>' + data + '</div>';
       });
+      /*
       chatForm.onsubmit = function(e){
         e.preventDefault();
         if(chatInput.value[0] === '/')
@@ -477,7 +540,7 @@
           console.log(data);
         });
       }
-
+      */
     </script>
   </body>
 </html>
