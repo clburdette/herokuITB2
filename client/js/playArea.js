@@ -1,4 +1,4 @@
-//MOVE TO CLIENT
+//this script largely intact from single player client-based version created for CSE322
 var playArea = {
 
 makeCanvasTags : function(amount)                          //create string containing all HTML canvas tags for placement in parent div tag
@@ -15,7 +15,7 @@ makeCanvasTags : function(amount)                          //create string conta
   temp += '<canvas id="player2" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+4).toString() +';"></canvas>"';
   temp += '<canvas id="UI" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+5).toString() +';"></canvas>"';
 
-  document.getElementById("parent").innerHTML = temp;      //last 3 canvases are for player emitted projectiles, player character object(s), and user interface respectively
+  document.getElementById("parent").innerHTML = temp;      //last 4 canvases are for player emitted projectiles, player1 character object, player2 character object, and user interface respectively
 }                                                          //TODO rename weapons canvas to projectiles for sake of continuity
 ,      
 makeCanvases : function(amount)                            //fills the array that will hold the canvas documents with temp variables
@@ -60,19 +60,20 @@ clearCanvases : function()                                 //clears last frame's
 ,
 makePlayerLayer : function()
 {
-  playArea.playerCanvas = document.getElementById("player");         //creates player canvas, context          
+  playArea.playerCanvas = document.getElementById("player");            //creates player canvas, context          
   playArea.playerContext = playArea.playerCanvas.getContext('2d');
 }
 ,
 makePlayer2Layer : function()
 {
-  playArea.player2Canvas = document.getElementById("player2");         //creates player canvas, context          
+  playArea.player2Canvas = document.getElementById("player2");          //creates player 2 canvas, context          
   playArea.player2Context = playArea.player2Canvas.getContext('2d');
 }
 ,
 makeWeaponsLayer : function()
 {
-  playArea.weaponsCanvas = document.getElementById("weapons");       //creates weapons canvas, context
+  playArea.weaponsCanvas = document.getElementById("weapons");          //creates weapons canvas, context
   playArea.weaponsContext = playArea.weaponsCanvas.getContext('2d');
 }
-};                                                        //updated from CSE322 to use for CSE4050
+};                                                        
+//updated from CSE322 to use for CSE4050

@@ -1,8 +1,8 @@
-const { COPYFILE_FICLONE_FORCE } = require('constants');
+const { COPYFILE_FICLONE_FORCE } = require('constants');                            //VS Code added this. I'm not sure what it does.
 const { SERVFAIL } = require('dns');
-var express = require('express');
+var express = require('express');                                                   //sets up express
 var fs = require('fs');
-var app = express();
+var app = express();                                                                //creates express object and then links it to the client script
 var serv = require('http').Server(app);
 
 app.get('/', function(req, res) {
@@ -11,13 +11,13 @@ app.get('/', function(req, res) {
 
 app.use('/client', express.static(__dirname + '/client'));
 
-serv.listen(process.env.PORT || 2000);
+serv.listen(process.env.PORT || 2000);                                              //starts server and allows it to be accessed either locally or by Heroku
 console.log("server initialized");
-//from classes file
+                                                                                    //TODO move significant portions into other js files and reference from them for better organization
 
-class GameSession
-{
-  constructor(player1, socket1)
+class GameSession                                                                   //object wrapper for game object. Made for multiplayer games
+{                                                                                   //TODO get single player games working with this as well to simplify the server code
+  constructor(player1, socket1)                                                         
   {
     this.game = null;
     this.player1 = player1;
@@ -28,58 +28,58 @@ class GameSession
   }
 }
 
-class Game
-{
+class Game                                                                          //game object.  allows games to be run as instances on the server
+{                                                                                     
   constructor(playerPosX, playerPosY, isTwoPlayerGame)
   {
-    this.numCanvases = 16;                                          //defines amount of layers among play area objects
-    this.spawnClock = 0;                                            //temp variables to keep objects from spawning
-    this.spawnRate = 10;
-    this.isTwoPlayerGame = isTwoPlayerGame;                                          //every frame, also increase difficulty
-    this.player = new Game.Player(playerPosX, playerPosY, 0, 0, 20, 10000, 100);
-    this.player2 = null;                                                    //player character object
-    this.playerObjects = [];                                        //array that holds player and all player-fired objects
-    this.PLAYER_LIST = [];                                          //duplicated in TUT
-    this.patientHealth = 1000;                                      //health score metric for display
-    this.randomizer;                                                //variable for randomizing various processes
-    this.layerObjects = [];
-    this.gameOver = false;
-    this.intervalTime = 20;                                                 //tracks minutes elapsed
-    this.playerScore = 0;
-    this.playerScore2 = 0;                                         //player's actual score
-    this.displayedScore = 0;
-    this.displayedScore2 = 0;
-    this.zDifficultyMultiplier = 1;                                       //displayed score for score incrementation animation
-    this.multiplier = 1;
-    this.multiplier2 = 1;
-    this.tick = 0;                                           //score multiplier
-    this.pressedKeys1 = {"a":false,"d":false,"s":false, "w":false, "m":false};
-    this.pressedKeys2 = {"a":false,"d":false,"s":false, "w":false, "m":false};
-    this.viewPackage = {                                        
+    this.numCanvases = 16;                                                          //defines amount of layers among play area objects
+    this.spawnClock = 0;                                                            //temp variables to keep objects from spawning
+    this.spawnRate = 10;                                                            //every frame, also increase difficulty
+    this.isTwoPlayerGame = isTwoPlayerGame;                                         //for handling session joins and disconnects. may be redundant
+    this.player = new Game.Player(playerPosX, playerPosY, 0, 0, 20, 10000, 100);    //player character object.  created when game instance is created  
+    this.player2 = null;                                                            //player 2 object. initialized when 2nd player joins a GameSession
+    this.playerObjects = [];                                                        //array that holds player(s) and all player-fired objects
+    this.PLAYER_LIST = [];                                                          //list of players. not currently used, but may use it for expansion to modes with more players
+    this.patientHealth = 1000;                                                      //health score metric for display
+    this.randomizer;                                                                //variable for randomizing various processes
+    this.layerObjects = [];                                                         //non-player objects
+    this.gameOver = false;                                                          //game over flag
+    this.intervalTime = 20;                                                         //synch to time game loop for determining distances in reference to a single frame
+    this.playerScore = 0;                                                           //player1's actual score
+    this.playerScore2 = 0;                                                          //player2's actual score
+    this.displayedScore = 0;                                                        //player1's displayed score
+    this.displayedScore2 = 0;                                                       //player2's displayed score
+    this.zDifficultyMultiplier = 1;                                                 //increases speed of movement for non-player object in the game's z-axis to increase difficutly over time
+    this.multiplier = 1;                                                            //player1 score multiplier
+    this.multiplier2 = 1;                                                           //player2 score multiplier
+    this.tick = 0;                                                                  //for keeping track of time
+    this.pressedKeys1 = {"a":false,"d":false,"s":false, "w":false, "m":false};      //player1 latest input info received
+    this.pressedKeys2 = {"a":false,"d":false,"s":false, "w":false, "m":false};      //player2 latest input info received
+    this.viewPackage = {                                                            //player1 UI information package to be sent to client
       playerScore : 0,                                          
       multiplier : 1,
       patientHealth : 1000,
     };
-    this.viewPackage2 = {                                                
+    this.viewPackage2 = {                                                           //player2 UI information package to be sent to client                                              
       playerScore : 0,                                          
       multiplier : 1,
       patientHealth : 1000,
     };
 
-    this.playerObjects.push(this.player);
+    this.playerObjects.push(this.player);                                           //add player1 object to playerObjects array on Game instance creation
 
-    this.makeLayers(this.numCanvases);
+    this.makeLayers(this.numCanvases);                                              //creates the array that will hold the non-player objects for tracking and computation
   }
 
 
-fire(owner)                                           //dynamically create missile at player's fire point in the direction of player's forward vector
-{                                                         //refactor this out of game loop and into player object for multiplayer                        
+fire(owner)                                                                         //dynamically create missile at player's fire point in the direction of player's forward vector
+{                                                                                   //refactor this out of game loop and into player object for multiplayer                       
   var spawn = new Game.Projectile(owner.xPos+owner.FirePointX, owner.yPos+owner.FirePointY, owner.FirePointX*30, owner.FirePointY*30, 10, 2, owner);
-  this.playerObjects.push(spawn);                              //place in array with player objects so they dont collide with each other 
+  this.playerObjects.push(spawn);                                                   //place in array with player objects so they dont collide with each other 
 }
 
-makeLayers(amount)                              //fills the canvasObjects array with empty arrays that will be
-{                                                          //used to hold dynamically created game objects
+makeLayers(amount)                                                                  //fills the non player objects array with empty arrays that will be
+{                                                                                   //used to hold dynamically created game objects at various z-axis levels
   for(var i=0; i < amount; i++)
   {
     var temp = [];
@@ -87,7 +87,7 @@ makeLayers(amount)                              //fills the canvasObjects array 
   }
 
 }
-spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)  //checks to see if new object will collide with existing objects in a given canvas layer
+spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)                             //checks to see if new object will collide with existing objects in a given layer
 {
   var obj1;                                              
   var willCollide = false;
@@ -95,11 +95,11 @@ spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)  //checks to see if new 
   for(var i=0; i < objects.length;i++)
   {
     obj1 = objects[i];
-    if(Math.abs(spawnXPos-obj1.xPos)<=(sizeToSpawn + obj1.scale)) //rough distance check based on X position
+    if(Math.abs(spawnXPos-obj1.xPos)<=(sizeToSpawn + obj1.scale))                   //rough distance check based on X position
     {
       var diffX = spawnXPos-obj1.xPos;
       var diffY = spawnYPos-obj1.yPos;
-      var sqDistance= Math.pow(diffX,2) + Math.pow(diffY,2);      //if near in X, check actual distance between objects, and compare to combined radius
+      var sqDistance= Math.pow(diffX,2) + Math.pow(diffY,2);                        //if near in X, check actual distance between objects, and compare to combined radius
 
       if(sqDistance <= Math.pow(obj1.scale + sizeToSpawn,2)){willCollide = true;}
     }
@@ -108,9 +108,9 @@ spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)  //checks to see if new 
   return willCollide;
 } 
 
-spawner(objects)                                 //dynamically spawns objects using various random parameters within set ranges.
-{                                                         //input parameter is an array of objects in a given layer, to which the spawned
-  var randomX = Math.floor(Math.random() * 1024);         //object is added
+spawner(objects)                                                                    //dynamically spawns objects using various random parameters within set ranges.
+{                                                                                   //input parameter is an array of objects in a given layer, to which the spawned
+  var randomX = Math.floor(Math.random() * 1024);                                   //object is added
   var randomY = Math.floor((Math.random() * 768)-10);
   var ranSize = Math.floor(Math.random() * 90) + 10;
 
@@ -122,7 +122,7 @@ spawner(objects)                                 //dynamically spawns objects us
     var ranZVel = Math.random() * 5;
     var ranDensity = Math.floor(Math.random() * 50) + 1;
 
-    if(objects==this.layerObjects[this.numCanvases - 1])             //assigns a Z position based on the context of the objects in the input parameter array
+    if(objects==this.layerObjects[this.numCanvases - 1])                            //assigns a Z position based on the layer of the objects in the input parameter array
     {
       randomZ = Math.floor(Math.random() * 5 + 100);
     }
@@ -137,46 +137,45 @@ spawner(objects)                                 //dynamically spawns objects us
       }
     }
     var spawn = new Game.Entity(randomX, randomY, randomZ, ranXVel, ranYVel, ranZVel, ranSize, ranDensity);
-    objects.push(spawn);                                  //create new gameplay object and place into in the array for that canvas based on z-position
+    objects.push(spawn);                                                            //create new gameplay object and place into in the array for that layer based on z-position
 
   }
 }
 
-spawnerLoop()                                 //randomly chooses an array of objects from the "bottom" 6 game layers
-{                                                      //and passes it into the spawner function
-  var ranCanvas = Math.floor(Math.random() * 5);       //TODO rename function. This is not a loop.
+spawnerLoop()                                                                       //randomly chooses an array of objects from the "bottom" 6 game layers
+{                                                                                   //and passes it into the spawner function
+  var ranCanvas = Math.floor(Math.random() * 5);                                    //TODO rename function. This is not a loop.
   this.spawner(this.layerObjects[ranCanvas]);
-
 }
 
-cleanUpOffScreen(objects)                     //checks if objects have strayed too far off screen and removes them
-{                                                      //from the appropriate object array, eliminating update of the given
-  for(var i=0; i < objects.length; i++)                    //object and allowing it to be garbage collected
+cleanUpOffScreen(objects)                                                           //checks if objects have strayed too far off screen and removes them
+{                                                                                   //from the appropriate object array, eliminating update of the given
+  for(var i=0; i < objects.length; i++)                                             //object and allowing it to be garbage collected
   {
-    var obj = objects[i];                              //objects completely off screen left, right and bottom.
-    if((obj.xPos-obj.scale)>1024||       //top allows some leeway for objects to leave play area
-       (obj.xPos+obj.scale)<0||                        //and then return
+    var obj = objects[i];                                                           //objects completely off screen left, right and bottom.
+    if((obj.xPos-obj.scale)>1024||                                                  //top allows some leeway for objects to leave play area
+       (obj.xPos+obj.scale)<0||                                                     //and then return
        (obj.yPos-obj.scale)>768||
        (obj.yPos+obj.scale*10)<0)
     {
       if((obj.yPos-obj.scale)>768 && objects==this.layerObjects[this.numCanvases-1])
       {
-        this.patientHealth -= obj.scale;                    //effects patient health score and resets multiplier
-        if(obj.owner == this.player){ this.multiplier = 1;}
-        else if(obj.owner == this.player2){ this.multiplier2 = 1;}                        //if object removed from past bottom of screen. (i.e. pathogen
-      }                                               //will effect patient) need to adjust this for multiplayer
-      objects.splice(i,1);                             //possibly continue use for combined multiplier
-    }                                                  //and give each player their own multiplier in addition
+        this.patientHealth -= obj.scale;                                            //effects patient health score and resets multiplier(s)
+        if(obj.owner == this.player){ this.multiplier = 1;}                         //if object removed from past bottom of screen. (i.e. pathogen
+        else if(obj.owner == this.player2){ this.multiplier2 = 1;}                  //will effect patient)
+      }                                                                             
+      objects.splice(i,1);                                                          
+    }                                                                               
   }
 }
 
-cleanUpWeapons()                              //removes player generated projectiles when too far off screen                       
-{                                                      //so they no longer update and can be garbage collected
+cleanUpWeapons()                                                                    //removes player generated projectiles when too far off screen                       
+{                                                                                   //so they no longer update and can be garbage collected
   var i;
   if(this.isTwoPlayerGame){i = 2;}
   else{i = 1;}
-  for(i; i < this.playerObjects.length; i++)              //Allows leeway so projectiles can strike partially off screen
-  {                                                    //objects. rename to cleanUpProjectiles    
+  for(i; i < this.playerObjects.length; i++)                                        //Allows leeway so projectiles can strike partially off screen
+  {                                                                                 //objects. rename to cleanUpProjectiles    
     var obj = this.playerObjects[i];
     if((obj.xPos-100)>1024||
        (obj.xPos+100)<0||
@@ -190,7 +189,7 @@ cleanUpWeapons()                              //removes player generated project
   }
 }
 
-cleanUpLoop()                                 //sends each canvas layer object array into the clean up function
+cleanUpLoop()                                                                       //sends each layer object array into the clean up function
 {
   this.cleanUpWeapons();
 
@@ -200,64 +199,64 @@ cleanUpLoop()                                 //sends each canvas layer object a
   } 
 }
 
-handleInput(keySet,playerToAccess)                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
+handleInput(keySet,playerToAccess)                                                  //handles input data originating from clients and adjusts player object position, orientation. and speed accordingly
 {
   if(!keySet || keySet == null)
   { 
     keySet = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
   }
-  if(keySet["a"]&&keySet["d"]&&keySet["w"])         //forward no rotation when a,d,w pressed
+  if(keySet["a"]&&keySet["d"]&&keySet["w"])                                         //forward no rotation when a,d,w pressed
   {
     playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);    
   }
-  else if(keySet["a"]&&keySet["w"])                      //forward and rotate left when a,w pressed
+  else if(keySet["a"]&&keySet["w"])                                                 //forward and rotate left when a,w pressed
   {
     playerToAccess.changeAngle(-0.05);
     playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY); 
   }                                 
-  else if(keySet["d"]&&keySet["w"])                      //forward and rotate right when d,w, pressed
+  else if(keySet["d"]&&keySet["w"])                                                 //forward and rotate right when d,w, pressed
   {
     playerToAccess.changeAngle(0.05);
     playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);
   }
-  else if(keySet["a"]&&keySet["s"])                     //backward and rotate left when a,s, pressed
+  else if(keySet["a"]&&keySet["s"])                                                 //backward and rotate left when a,s, pressed
   {
     playerToAccess.changeAngle(-0.02);
     playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY);
   }                                                       
-  else if(keySet["d"]&&keySet["s"])                     //backward and rotate right when d,s, pressed
+  else if(keySet["d"]&&keySet["s"])                                                 //backward and rotate right when d,s, pressed
   {
     playerToAccess.changeAngle(0.02);
     playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY); 
   }                                                       
-  else if(keySet["a"])                                       //rotate left when a only pressed
+  else if(keySet["a"])                                                              //rotate left when a only pressed
   {
     playerToAccess.changeAngle(-0.1);
   }
-  else if(keySet["d"])                                       //rotate right when d only pressed
+  else if(keySet["d"])                                                              //rotate right when d only pressed
   {
     playerToAccess.changeAngle(0.1);
   }
-  else if(keySet["s"])                                       //backward when s only pressed
+  else if(keySet["s"])                                                              //backward when s only pressed
   {
     playerToAccess.changeVel(-0.001*playerToAccess.FirePointX,-0.001*playerToAccess.FirePointY)               
   }
-  else if(keySet["w"])                                       //forward when w only pressed
+  else if(keySet["w"])                                                              //forward when w only pressed
   {
     playerToAccess.changeVel(0.01*playerToAccess.FirePointX,0.01*playerToAccess.FirePointY);             
   }
   if(keySet["m"]){ this.fire(playerToAccess); }
 }
 
-updateLoop(delta, zMultiplier)                             //input parameter is amount of time which has passed during a given frame
-{                                                      //which is then passed into the update function of each object in the game
-  for(var i=0; i < this.playerObjects.length; i++)          
+updateLoop(delta, zMultiplier)                                                      //first input parameter is amount of time which has passed during a given frame
+{                                                                                   //which is then passed into the update function of each object in the game
+  for(var i=0; i < this.playerObjects.length; i++)                                  //second is temp multiplier for adjusting difficulty over time 
   {
-    this.playerObjects[i].update(delta);                    //updates player and all player generated projectiles
+    this.playerObjects[i].update(delta);                                            //updates player(s) and all player generated projectiles
   }  
 
-  for(var i=0; i < this.layerObjects.length; i++)          //updates each object in a given canvas layer one at a time, one canvas at
-  {                                                    //time until all non-player objects are updated
+  for(var i=0; i < this.layerObjects.length; i++)                                   //updates each object in a given layer one at a time, one layer at
+  {                                                                                 //time until all non-player objects are updated
     var group = this.layerObjects[i];
     for(var j=0; j < group.length; j++)
     {
@@ -266,21 +265,21 @@ updateLoop(delta, zMultiplier)                             //input parameter is 
   }
 }
 
-moveInZ(objects)                                  //moves objects between the various canvas layer object arrays based on their Z position value
-{                                                          //provides the illusion of movement in the 3rd spatial direction.
-  for(var i = 0; i < objects.length; i++)                  //input parameter is an array of objects rendering in a given canvas layer
-  {                                                        //TODO bool or early check so n-squared algorithm isnt necessary for objects that wont be moving
+moveInZ(objects)                                                                    //moves objects between the various layer object arrays based on their Z position value
+{                                                                                   //provides the illusion of movement in the 3rd spatial direction.
+  for(var i = 0; i < objects.length; i++)                                           //input parameter is an array of objects rendering in a given layer
+  {                                                                                 //TODO bool or early check so n-squared algorithm isnt necessary for objects that wont be moving
     for(var j = 0; j < this.layerObjects.length; j++)
     {
       if(objects[i].zPos < (j+1)*(80/this.numCanvases) && (j+1)*(80/this.numCanvases) < 80)  //the z position zone of the numCanvases-1 bottom layers
       {
-        this.layerObjects[j].push(objects[i]);                 //adds object to the object array for that layer
-        objects.splice(i,1);                               //removes object from previous layer
-        j = this.layerObjects.length;                          //exits loop
+        this.layerObjects[j].push(objects[i]);                                      //adds object to the object array for that layer
+        objects.splice(i,1);                                                        //removes object from previous layer
+        j = this.layerObjects.length;                                               //exits loop
       }
-      else if(objects[i].zPos >= (80 - (80/this.numCanvases)))  //special case for state for top layer where player objects reside
-      {
-        if(objects[i].yPos < 600)                          //keeps objects from pushing into the top layer at the bottom of the screen
+      else if(objects[i].zPos >= (80 - (80/this.numCanvases)))                      //special case for state for top layer where player objects reside
+      {                                                                             //TODO figure out collision between players if that ends up being desireable  
+        if(objects[i].yPos < 600)                                                   //keeps objects from pushing into the top layer at the bottom of the screen
         {
           this.layerObjects[this.numCanvases-1].push(objects[i]);
           objects.splice(i,1);
@@ -291,7 +290,7 @@ moveInZ(objects)                                  //moves objects between the va
   }              
 }
 
-moveInZLoop()                                     //sends all of the canvas layer object arrays into the moveInZ function to be checked
+moveInZLoop()                                                                       //sends all of the layer object arrays into the moveInZ function to be checked
 {
   for(var i=0; i < this.layerObjects.length;i++)
   {
@@ -299,38 +298,38 @@ moveInZLoop()                                     //sends all of the canvas laye
   }
 }
 
-detectCollision(objects)                          //detects collision between all collidable objects in a given canvas layer object array
-{                                                          //input parameter is a canvas layer object array
+detectCollision(objects)                                                           //detects collision between all collidable objects in a given layer object array
+{                                                                                  //input parameter is a layer object array
                                                                                                          
-  for(var i=0; i < objects.length;i++)                         //resets each object's variable that indicates if the object is colliding with something else during a given frame
+  for(var i=0; i < objects.length;i++)                                             //resets each object's variable that indicates if the object is colliding with something else during a given frame
   {
     objects[i].isColliding = false;
   }
 
-  for(var i=0; i < objects.length;i++)                         //compares each object with every other object in the canvas layer object array
+  for(var i=0; i < objects.length;i++)                                             //compares each object with every other object in the layer object array
   {
 
     for(var j=i+1; j < objects.length;j++)
     {
       if((Math.abs(objects[i].xPos-objects[j].xPos)) <= (objects[i].scale + objects[j].scale))
-      {                                                    //quick check to see if objects are near each other in X before doing more computationally heavy
-        this.collisionReaction(objects,i,j);                    //checks for collision
-      }                                                    //TODO double this up to check for Y
+      {                                                                           //check to see if objects are near each other in X before doing more computationally heavy
+        this.collisionReaction(objects,i,j);                                      //checks for collision
+      }                                                                           //TODO double this up to check for Y
     }
   }
 }
 
-playerCollision(objects)                          //detects collision between player and player projectiles with top layer objects
+playerCollision(objects)                                                          //detects collision between player(s) and player projectiles with top layer objects
 {
   var obj1;
   var obj2;
                                             
-  for(var i=0; i < this.playerObjects.length;i++)                   //resets each player object's variable that indicates if the object is colliding with something
-  {                                                        //else during a given frame
+  for(var i=0; i < this.playerObjects.length;i++)                                 //resets each player(s) object's variable that indicates if the object is colliding with something
+  {                                                                               //else during a given frame
     this.playerObjects[i].isColliding = false;
   }
                                                    
-  for(var i=0; i < objects.length;i++)                         //same for all non-player objects
+  for(var i=0; i < objects.length;i++)                                            //same for all non-player objects
   {
     objects[i].isColliding = false;
   }
@@ -338,18 +337,18 @@ playerCollision(objects)                          //detects collision between pl
   for(var i=0; i < this.playerObjects.length; i++)
   {
     obj1 = this.playerObjects[i];
-    for(var j=0; j < objects.length;j++)                               //compares each object with player and/or player projectiles
+    for(var j=0; j < objects.length;j++)                                          //compares each object with player(s) and/or player projectiles
     {
       obj2 = objects[j];
-      if((Math.abs(obj1.xPos-obj2.xPos)) <= (obj1.scale + obj2.scale))  //filters checks for collision based on X position
-      {                                                                 //TODO add Y position check as well.
+      if((Math.abs(obj1.xPos-obj2.xPos)) <= (obj1.scale + obj2.scale))            //filters checks for collision based on X position
+      {                                                                           //TODO add Y position check as well.
         var deltaX = obj2.xPos-obj1.xPos;
         var deltaY = obj2.yPos-obj1.yPos;
         var sqDistance= Math.pow(deltaX,2) + Math.pow(deltaY,2);
-        if(sqDistance <= (Math.pow(obj1.scale + obj2.scale,2)))    //checks to see if the distance between two objects is less than equal to their combined radii
-        {                                                          //thereby indicating a collision.
-          obj1.isColliding=true;                                   //makes various physics calculations based on the parameters on the two objects in the collision
-          obj2.isColliding=true;                                   //TO DO move into a function  
+        if(sqDistance <= (Math.pow(obj1.scale + obj2.scale,2)))                   //checks to see if the distance between two objects is less than equal to their combined radii
+        {                                                                         //thereby indicating a collision.
+          obj1.isColliding=true;                                                  //makes various physics calculations based on the parameters on the two objects in the collision
+          obj2.isColliding=true;                                                  //TO DO move into a function  
           var vNorm = {x: deltaX/Math.sqrt(sqDistance), y: deltaY/Math.sqrt(sqDistance)};
           var vRelVel = {x: obj1.xVel-obj2.xVel, y: obj1.yVel-obj2.yVel};
           var speed = (vRelVel.x * vNorm.x) + (vRelVel.y * vNorm.y);
@@ -372,8 +371,8 @@ playerCollision(objects)                          //detects collision between pl
             obj2.xVel += (vecTwo.x/obj2.scale)*1000;
             obj2.yVel += (vecTwo.y/obj2.scale)*1000;
           }
-          if(this.isTwoPlayerGame)
-          {
+          if(this.isTwoPlayerGame)                                                //handles player scoring based one game type
+          {                                                                       //TODO refactor into something less messy  
             if(i>1)
             {
               if(!this.endGame())
@@ -382,10 +381,10 @@ playerCollision(objects)                          //detects collision between pl
                 else if(this.playerObjects[i].owner == this.player2){this.playerScore2 += Math.ceil(1000/obj2.scale) * this.multiplier2;}
               }
               if(this.playerObjects[i].owner == this.player){this.multiplier++;}
-              else if(this.playerObjects[i].owner == this.player2){this.multiplier2++;}                                                                                  //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
+              else if(this.playerObjects[i].owner == this.player2){this.multiplier2++;}                                                                                  
               this.playerObjects.splice(i,1);
               if(obj2.scale > 60)
-              {
+              {                                                                   //large gameplay objects split in two when hit
                 var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
                 var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
                 var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
@@ -395,8 +394,8 @@ playerCollision(objects)                          //detects collision between pl
                 objects.push(spawn);
               }
             }
-            else if( i == 0 ){this.multiplier = 1;}
-            else if( i == 1 ){this.multiplier2 = 1;}                                                                         //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
+            else if( i == 0 ){this.multiplier = 1;}                               //multipier resets when player character object hits gameplay "enemy" object
+            else if( i == 1 ){this.multiplier2 = 1;}                                                                                 
             if(obj2.scale<10){objects.splice(j,1);}
           }
           else
@@ -407,7 +406,7 @@ playerCollision(objects)                          //detects collision between pl
               {
                 this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;
                 this.multiplier++;
-              }                                                                                 //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP
+              }                                                                                 
               this.playerObjects.splice(i,1);
               if(obj2.scale > 60)
               {
@@ -420,7 +419,7 @@ playerCollision(objects)                          //detects collision between pl
                 objects.push(spawn);
               }
             }
-            if( i == 0 ){this.multiplier = 1;}                                                                       //TODO NEED TO ADJUST THIS TO CURRENT "view" SETUP        
+            if( i == 0 ){this.multiplier = 1;}                                                                               
             if(obj2.scale<10){objects.splice(j,1);}
           }
         }
@@ -428,7 +427,7 @@ playerCollision(objects)                          //detects collision between pl
     }
   }
 }
-collisionReaction(objs,i,j) //TODO update comments
+collisionReaction(objs,i,j)                                                      //simulated physics on collision
 {
       var obj1 = objs[i];
       var obj2 = objs[j];
@@ -437,12 +436,12 @@ collisionReaction(objs,i,j) //TODO update comments
       var deltaY = obj2.yPos-obj1.yPos;
       var sqDistance= Math.pow(deltaX,2) + Math.pow(deltaY,2);
       var overlap = sqDistance/(Math.pow(obj1.scale + obj2.scale,2));
-      if(overlap <= 1)                                           //checks to see if the distance between two objects is less than equal to their combined radii
-      {                                                          //thereby indicating a collision.
-        obj1.isColliding=true;                                   //makes various physics calculations based on the parameters on the two objects in the collision
-        obj2.isColliding=true;                                   //TO DO move into a function
+      if(overlap <= 1)                                                          //checks to see if the distance between two objects is less than equal to their combined radii
+      {                                                                         //thereby indicating a collision.
+        obj1.isColliding=true;                                                  //makes various physics calculations based on the parameters on the two objects in the collision
+        obj2.isColliding=true;                                                  //TO DO move into a function
         var midPoint = {x: (obj2.xPos+obj1.xPos)/2, y: (obj2.yPos+obj1.yPos)/2};
-        if((obj1.scale + obj2.scale) < 70 && overlap < 0.98)     //small objects that collide and sufficiently overlap combine into a larger object
+        if((obj1.scale + obj2.scale) < 70 && overlap < 0.98)                    //small objects that collide and sufficiently overlap combine into a larger object
         {
           var obj1Mass = obj1.scale*obj1.scale*obj1.density;
           var obj2Mass = obj2.scale*obj2.scale*obj2.density;
@@ -452,7 +451,7 @@ collisionReaction(objs,i,j) //TODO update comments
           var spawn = new Game.Entity(midPoint.x, midPoint.y, (obj1.zPos + obj2.zPos)/2, obj3Vel.x, obj3Vel.y, (obj1.zVel + obj2.zVel)/2, Math.ceil((obj1.scale + obj2.scale)/Math.sqrt(2)),
                                 ((((Math.pow(obj1.scale,2) * obj1.density) + (Math.pow(obj2.scale,2) * obj2.density))) / (Math.pow(obj1.scale + obj2.scale,2))));
           if(i<j)
-          {                                                      //uses position in array to determine correct order of removal
+          {                                                                     //uses position in array to determine correct order of removal
             objs.splice(j,1);
             objs.splice(i,1);
           }
@@ -461,16 +460,16 @@ collisionReaction(objs,i,j) //TODO update comments
             objs.splice(i,1);
             objs.splice(j,1);
           }
-          objs.push(spawn);                                      //add new combined object to object array 
+          objs.push(spawn);                                                    //add new combined object to object array 
         }
         else
         {
-          if(overlap > 0.95)                                     //large objects with not much overlap on collision will bounce off each other
+          if(overlap > 0.95)                                                   //large objects with not much overlap on collision will bounce off each other
           {
             this.collisionPhys(deltaX, deltaY, sqDistance, obj1, obj2); 
           }
-          else if(overlap <=0.95)                                 //large objects with more overlap will react more violently, accelerating apart 
-          {                                                       //until no longer overlapping
+          else if(overlap <=0.95)                                              //large objects with more overlap will react more violently, accelerating apart 
+          {                                                                    //until no longer overlapping
             var distOne = Math.pow((midPoint.x - obj1.xPos),2) + Math.pow((midPoint.y - obj1.yPos),2);
             var distTwo = Math.pow((midPoint.x - obj2.xPos),2) + Math.pow((midPoint.y - obj2.yPos),2);
             var vecOne = {x: (obj1.xPos - midPoint.x)/distOne, y: (obj1.yPos - midPoint.y)/distOne};
@@ -484,8 +483,8 @@ collisionReaction(objs,i,j) //TODO update comments
       }
 }
 
-collisionPhys(dX,dY,sqDist,o1,o2)                       //takes the forward momentum of the two objects and determines what their direction
-{                                                                //and velocity should be after collision.
+collisionPhys(dX,dY,sqDist,o1,o2)                                             //takes the forward momentum of the two objects and determines what their direction
+{                                                                             //and velocity should be after collision.
           var vNorm = {x: dX/Math.sqrt(sqDist), y: dY/Math.sqrt(sqDist)};
           var vRelVel = {x: o1.xVel-o2.xVel, y: o1.yVel-o2.yVel};
           var speed = (vRelVel.x * vNorm.x) + (vRelVel.y * vNorm.y);
@@ -496,7 +495,7 @@ collisionPhys(dX,dY,sqDist,o1,o2)                       //takes the forward mome
           o2.xVel += (impulse*o1.scale*o1.density*vNorm.x);
           o2.yVel += (impulse*o1.scale*o1.density*vNorm.y);
 }
-collisionLoop()                                         //sends each canvas layer object array into the collision detection function
+collisionLoop()                                                               //sends each layer object array into the collision detection function
 {
   this.playerCollision(this.layerObjects[this.numCanvases-1]);
 
@@ -506,29 +505,30 @@ collisionLoop()                                         //sends each canvas laye
   }
 }
 
-endGame()                                                             //checks conditions for game being over
-{                                                                     //TODO adjust for multiplayer
-  var gameOver;
+endGame()                                                                     //checks conditions for game being over
+{                                                                             
+  var gameOver = false;
 
-  if(this.player.health <= 0)                                         //game over if player hull is compromised
+  if(this.player.health <= 0)                                                 //game over if player(s) hull is compromised
   {
     this.player.health = 0;
     gameOver = true;
   }
-  else if(this.patientHealth <= 0)                                    //game over if too many pathogens get past the player and infect the patient
+  else if(this.player2.health <= 0)
+  {
+    this.player2.health =0;
+    gameOver = true;
+  }
+  else if(this.patientHealth <= 0)                                            //game over if too many pathogens get past the player and infect the patient
   {
     this.patientHealth = 0;
     gameOver = true;
-  }
-  else
-  { 
-    gameOver = false;
   }
 
   return gameOver;
 }
 
-  updateViewPackage()
+  updateViewPackage()                                                         //updates variables to be sent to client in ui layer package(s)
   {
     this.viewPackage.playerScore = this.playerScore;
     this.viewPackage.multiplier = this.multiplier;
@@ -538,28 +538,28 @@ endGame()                                                             //checks c
     this.viewPackage2.patientHealth = this.patientHealth;
   }
   
-  viewUpdate()                                     //MOVE TO SERVER, send info to clients
-  {
-    if(!this.endGame())                                          //while game isnt over, update game time, score and multplier
+  viewUpdate()                                                                //caps multipliers
+  {                                                                           //TODO rename. Has to be a better place for this
+    if(!this.endGame())                                          
     {
       if(this.multiplier >= 9){this.multiplier = 9;}
-      if(this.multiplier2 >= 9){this.multiplier2 = 9;}           //cap multiplier at 9
+      if(this.multiplier2 >= 9){this.multiplier2 = 9;}           
     }
     else
     {
       this.multiplier = 1;
       this.multiplier2 = 1;
-      this.gameOver = true;
+      this.gameOver = true;                                                   //this is redundant
     }
     this.updateViewPackage();  
   }
-}  //updated from CSE322 to use for CSE4050
+}
 
-  Game.Entity = class                                                                           //anything in the game that collides
-  {                                                                                      //expect for the player character
-                                                                                         //TODO draw function to client
-    constructor(xPos, yPos, zPos, xVel, yVel, zVel, scale, density)             //extends GameObject with scale and density
-    {                                                                                    //for calculating physics interactions on collision   
+  Game.Entity = class                                                         //anything in the game that collides except for player characters
+  {                                                                           
+                                                                                         
+    constructor(xPos, yPos, zPos, xVel, yVel, zVel, scale, density)            
+    {                                                                                       
       this.xPos = xPos;
       this.yPos = yPos;
       this.zPos = zPos;
@@ -571,9 +571,9 @@ endGame()                                                             //checks c
       this.isColliding = false;
     }
   
-    draw()                                                                              //determines where the object resides and draws it
-    {                                                                                   //and draws it on the appropriate canvas context
-      if(this.context==contextBag[numCanvases-1])                                       //in the appropriate color 
+    draw()                                                                    //determines where the object resides and draws it
+    {                                                                         //TODO remove this. Left over from client version          
+      if(this.context==contextBag[numCanvases-1])                                        
       {
         this.context.fillStyle = '#440033';
       }
@@ -581,34 +581,34 @@ endGame()                                                             //checks c
       {
         for(var i = 0; i < numCanvases; i++)
         {
-          if(this.context==contextBag[numCanvases-1-i])                                 //color determined by canvas, simulating depth 
-          {                                                                             //in the Z-axis. lighter colors are further away 
-            var num = (256/numCanvases)*i;                                              //non-player objects are purple when they are on
-            var color = '#' + num.toString(16) + '0000';                                //the same canvas as the player(s) and can collide
-            this.context.fillStyle = color;                                             //with them 
+          if(this.context==contextBag[numCanvases-1-i])                                  
+          {                                                                              
+            var num = (256/numCanvases)*i;                                              
+            var color = '#' + num.toString(16) + '0000';                                
+            this.context.fillStyle = color;                                             
           }
         }
       }
-      this.context.beginPath();                                                         //draw circle representing blood vessel in blood stream                         
+      this.context.beginPath();                                                                                  
       this.context.arc(this.xPos, this.yPos, this.scale, 0, 2*Math.PI);
       this.context.fill();
     }
   
-    update(seconds, zMultiplier)                                                                    //updates velocity and position of object 
+    update(seconds, zMultiplier)                                               //updates velocity and position of object 
     {
-      if(this.xVel != 0){this.xVel*=0.999;}                                            //friction, slowing velocity in all directions over time
+      if(this.xVel != 0){this.xVel*=0.999;}                                    //friction, slowing velocity in all directions over time
       if(this.yVel != 0){this.yVel*=0.999;}
       if(this.zVel != 0){this.zVel*=0.999;}	
-      this.yVel += 0.1;                                                                //simulates blood flow, moving objects toward bottom screen
-      this.xPos += this.xVel*seconds;                                                  //position updated by velocity during that frame
-      this.yPos += this.yVel*seconds;                                                  //in each spatial direction
+      this.yVel += 0.1;                                                        //simulates blood flow, moving objects toward bottom screen
+      this.xPos += this.xVel*seconds;                                          //position updated by velocity during that frame
+      this.yPos += this.yVel*seconds;                                          //in each spatial direction
       this.zPos += this.zVel*seconds*zMultiplier;
     }
   };
   
-  Game.Projectile = class                                                                     //emitted object which does not collide with players
-  {                                                                                    //and only operates within one canvas. no Z-movement.
-                                                                                       //TODO need to move draw function to client
+  Game.Projectile = class                                                      //emitted object which does not collide with players
+  {                                                                            //and only operates within one canvas. no Z-movement.
+                                                                                       
     constructor(xPos, yPos, xVel, yVel, scale, density, owner)
     {
       this.xPos=xPos;
@@ -620,7 +620,7 @@ endGame()                                                             //checks c
       this.owner = owner;
     }
   
-    draw()
+    draw()                                                                     //TODO remove this. happens on client
     {
       this.context.fillStyle = '#000000';                  
       this.context.beginPath();
@@ -635,12 +635,12 @@ endGame()                                                             //checks c
     }
   };
   
-  Game.Player = class                                                                      //player character object. duplicated in TUT
-  {                                                                                 //TODO Player object ON SERVER
-                                                                                    //TODO draw function needs to move to client
-    constructor(xPos, yPos, xVel, yVel, scale, density, health)            //May need to double up basic class information on
-    {                                                                               //So info is easier to handle since the draw function
-                                                           //Requires it. Same with anything updating that draws 
+  Game.Player = class                                                              //player character object.
+  {                                                                                
+                                                                                  
+    constructor(xPos, yPos, xVel, yVel, scale, density, health)            
+    {                                                                               
+                                                           
       this.xPos=xPos;
       this.yPos=yPos;
       this.xVel=xVel;
@@ -654,30 +654,30 @@ endGame()                                                             //checks c
       this.health=health;                                                          //health of the player object. displayed as hull.
       this.isColliding=false;
       this.angle=0;                                                                //angle of the player's forward vector in relation to true north
-      this.MAX_MAG=25;                                                             //maximum velocity of player object                                                            //for future expansion. will hold player object's weapons objects
+      this.MAX_MAG=25;                                                             //maximum velocity of player object                                                            
     }
    
-    draw()                                                                        //TO DO upgrade player appearance
-    {
+    draw()                                                                        //TODO upgrade player appearance
+    {                                                                             //TODO remove this function. takes place on client.    
       this.context.save();
-      this.context.translate(this.xPos, this.yPos);                               //move player canvas to new position
-      this.context.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
-      this.context.beginPath();                                                   //TODO only draw when player is imparting thrust
+      this.context.translate(this.xPos, this.yPos);                               
+      this.context.fillStyle = '#FFAA00';                                          
+      this.context.beginPath();                                                   
       this.context.arc(this.FirePointX/-2, this.FirePointY/-2, 14, 0, 2*Math.PI);
       this.context.fill();
-      this.context.fillStyle = '#0000FF';                                         //draw player fire point graphic
+      this.context.fillStyle = '#0000FF';                                         
       this.context.beginPath();
       this.context.arc(this.FirePointX, this.FirePointY, 4, 0, 2*Math.PI);
       this.context.fill();
-      this.context.rotate(this.angle);                                            //rotate canvas to the player's rotation 
-      this.context.fillStyle = '#00FF00';                                         //draw main body of player object
-      this.context.beginPath();                                                   //canvas is translated and rotated. player object
-      this.context.arc(0, 0, this.scale, 0, 2*Math.PI);                           //is rendered normally to make the player object
-      this.context.fill();                                                        //appear to translate and rotate relative to
-      if(this.isColliding)                                                        //player view
+      this.context.rotate(this.angle);                                            
+      this.context.fillStyle = '#00FF00';                                         
+      this.context.beginPath();                                                   
+      this.context.arc(0, 0, this.scale, 0, 2*Math.PI);                           
+      this.context.fill();                                                        
+      if(this.isColliding)                                                        
       {
-        this.context.fillStyle = '#FF0000';                                       //recolors player object on collision to indicate
-        this.context.beginPath();                                                 //to the player that a collision has occurred
+        this.context.fillStyle = '#FF0000';                                       
+        this.context.beginPath();                                                 
         this.context.arc(0, 0, this.scale, 0, 2*Math.PI);     
         this.context.fill();
         this.health--;
@@ -685,7 +685,7 @@ endGame()                                                             //checks c
       this.context.restore();          
     }
   
-    changeVel(xValue, yValue)                                                      //TODO figure out what I was doing here
+    changeVel(xValue, yValue)                                                     //TODO figure out what I was doing here
     {
       this.xVel += xValue;
       this.yVel += yValue;
@@ -741,7 +741,7 @@ endGame()                                                             //checks c
   }; 
 
 
-var SOCKET_LIST = {};
+var SOCKET_LIST = {};                                                             //Server variables used by the sockets
 var USER_LIST = {};
 var GAME_LIST = {};
 var SESSION_LIST = {};
@@ -752,9 +752,9 @@ var twoPlayerOpenings = 0;
 var MAX_CONNECTIONS = 10;
 var DEBUG = false;
 
-var io = require('socket.io')(serv,{});
-io.sockets.on('connection', function(socket){
-  socket.id = Math.random();
+var io = require('socket.io')(serv,{});                                           //sets up socket.io on the server
+io.sockets.on('connection', function(socket){                                     //when a new client connects, a socket is created for it and that socket is placed in an array for access
+  socket.id = Math.random();                                                      //various other variables track states and conditions of the socket
   socket.gameCreated = false;
   socket.hostingSession = false;
   socket.gameOverSent = false;
@@ -766,14 +766,11 @@ io.sockets.on('connection', function(socket){
   console.log('socket connection');
   connections++;
 
-//create game object socket object is session object
-//put game object into game objects array by socket.id
+  socket.on('signIn', function(data){                                             //sign in and sign up signal and data handling
 
-  socket.on('signIn', function(data){
-
-    fs.readFile('./login.json', (err, data2) => {
+    fs.readFile('./login.json', (err, data2) => {                                 //reads login info json file and compares it to data
       if(err)
-      {
+      {                                                                           //TODO move from JSON file to cloud based database for better security
         console.log("error reading file");
       }
       else
@@ -785,15 +782,15 @@ io.sockets.on('connection', function(socket){
       {  
         socket.playerID = data.username;
         USER_LIST[socket.id] = socket.playerID;
-        socket.emit('signInResponse', {success:true});
+        socket.emit('signInResponse', {success:true});                            //send response to client
       }
       else{socket.emit('signInResponse', {success:false});}
-      USERS = {};
+      USERS = {};                                                                 //clears temp user data, keeping JSON file data encapsulated
     });
   });
 
   socket.on('signUp', function(data){
-    fs.readFile('./login.json', (err, data2) => {
+    fs.readFile('./login.json', (err, data2) => {                                 //reads JSON file and checks against data from client
       if(err)
       {
         console.log("error reading file");       
@@ -813,7 +810,7 @@ io.sockets.on('connection', function(socket){
       {
         USERS[data.username] = data.password;
         var temp = JSON.stringify(USERS, null, 2);
-        fs.writeFile('./login.json', temp, function(err)
+        fs.writeFile('./login.json', temp, function(err)                          //writes new user to JSON login file
         {
           if(err){console.log("error writing file");}
           else{console.log('data written to login file. id: ' + socket.id);}
@@ -824,7 +821,7 @@ io.sockets.on('connection', function(socket){
     });
   });
 
-  function gameStartup()
+  function gameStartup()                                                          //creates new single player game
   {
     var game = new Game(512, 384, false);
     GAME_LIST[socket.id] = game;
@@ -836,7 +833,7 @@ io.sockets.on('connection', function(socket){
     console.log(activeGames + " games active");
   }
 
-  function twoPlayerSessionStartup()
+  function twoPlayerSessionStartup()                                              //creates new session to host 2 player game                                            
   {
     var hostedSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
     SESSION_LIST[socket.id] = hostedSession;
@@ -849,7 +846,7 @@ io.sockets.on('connection', function(socket){
     console.log(activeGames + " games active");
   }
 
-  socket.on("sessionReset", function(){
+  socket.on("sessionReset", function(){                                           //resets socket after 2 player session has concluded
     socket.gameCreated = false;
     delete GAME_LIST[socket.id];
     activeGames--;
@@ -864,11 +861,11 @@ io.sockets.on('connection', function(socket){
     console.log(activeGames + " games active");
   });
 
-  socket.on('disconnect', function(){
+  socket.on('disconnect', function(){                                             //things that occur when a player closes their browser window  
     if(!GAME_LIST[socket.id])
     {
-      if(socket.currentSession)
-      {
+      if(socket.currentSession)                                                   //nullifies 2nd player portion of a session and notifies session host
+      {                                                                           //when player number2(guest) leaves early
         //socket.currentSession.game.playerObjects.splice(1,1);
         socket.currentSession.game.isTwoPlayerGame = false;
         socket.currentSession.game.gameOver = true;
@@ -881,21 +878,21 @@ io.sockets.on('connection', function(socket){
     }
     else
     {
-      if(GAME_LIST[socket.id].isTwoPlayerGame)
+      if(GAME_LIST[socket.id].isTwoPlayerGame)                                    //ends game and session when session host drops out and notifies guest player                                 
       {
         SESSION_LIST[socket.id].socket2.emit("sessionHostDropped");
         delete GAME_LIST[socket.id];
         delete SESSION_LIST[socket.id];
         console.log("2 player game deleted");
       }
-      else
+      else                                                                        //ends single player game and removes it from game list  
       {
         delete GAME_LIST[socket.id];
         console.log("1 player game deleted");
       }
       activeGames--;
     }
-    socket.gameOverSent = true;
+    socket.gameOverSent = true;                                                   //logs and completes disconnection
     connections--;
     console.log("disconnection");
     console.log(connections + " connections active");
@@ -904,7 +901,7 @@ io.sockets.on('connection', function(socket){
     delete SOCKET_LIST[socket.id];
   });
 
-  socket.on('playerInput', function(data){   //socket paired automatically by socket io.  update pressedKeys variable of socket's game object here
+  socket.on('playerInput', function(data){                                        //input from client processed and set to approriate Game object for use in the game loop
     if(socket.inTwoPlayerGame)
     {
       if(socket.hostingSession)
@@ -922,7 +919,7 @@ io.sockets.on('connection', function(socket){
     }
   });
 
-  socket.on('startGame', function(){
+  socket.on('startGame', function(){                                             //receives and processes start single player game signal from client 
     if(connections <= MAX_CONNECTIONS && !socket.gameCreated)
     {  
       gameStartup();
@@ -933,14 +930,14 @@ io.sockets.on('connection', function(socket){
     }
   });
 
-  socket.on('startTwoPlayerGame', function(){
+  socket.on('startTwoPlayerGame', function(){                                    //receives and processes start two player game signal from client
     if(connections <= MAX_CONNECTIONS && !socket.gameCreated)
     {  
-      if(twoPlayerOpenings == 0)
-      {
+      if(twoPlayerOpenings == 0)                                                 //checks to see if anyone is waiting for a two player GameSession to be filled 
+      {                                                                          //if not, creates one and makes this socket the host 
         twoPlayerSessionStartup();
       }
-      else
+      else                                                                       //if a session is waiting, creates games and places game and 2nd player into the GameSession 
       {
         var tempSession;
         for(var i in SESSION_LIST)
@@ -950,7 +947,7 @@ io.sockets.on('connection', function(socket){
             SESSION_LIST[i].game = new Game( 340, 384, true);
             SESSION_LIST[i].game.player2 = new Game.Player(684, 384, 0, 0, 20, 10000, 100);
             SESSION_LIST[i].game.playerObjects.push(SESSION_LIST[i].game.player2);
-            SESSION_LIST[i].game.isTwoPlayerGame = true;
+            SESSION_LIST[i].game.isTwoPlayerGame = true;                        //adds necessary info to the GameSession object so both clients can access it
             SESSION_LIST[i].hasTwoPlayers = true;
             SESSION_LIST[i].player2 = USER_LIST[socket.id];
             SESSION_LIST[i].socket2 = SOCKET_LIST[socket.id];
@@ -960,7 +957,7 @@ io.sockets.on('connection', function(socket){
             break;
           }
         }
-        twoPlayerOpenings--;
+        twoPlayerOpenings--;                                                    //signals both clients that the game has started and raises necessary flags, logs
         tempSession.socket1.emit('twoPlayerGameStarted');
         tempSession.socket1.inTwoPlayerGame = true;
         tempSession.socket2.emit('twoPlayerGameStarted');
@@ -977,7 +974,7 @@ io.sockets.on('connection', function(socket){
     }
   });
 
-  socket.on('endGame', function(){
+  socket.on('endGame', function(){                                              //resets socket on end game signal from a client
     if(socket.gameCreated)
     {
       delete GAME_LIST[socket.id];
@@ -993,13 +990,12 @@ io.sockets.on('connection', function(socket){
     console.log(activeGames + " games active");
   });
 
-  socket.on('sendMsgToServer', function(data){
+  socket.on('sendMsgToServer', function(data){                                //for planned chat feature
     var playerName = socket.id;
     for(var i in SOCKET_LIST){
       SOCKET_LIST[i].emit('addToChat', playerName + ': ' + data);
     }
   });
-
 
   if(DEBUG)
   {
@@ -1010,20 +1006,20 @@ io.sockets.on('connection', function(socket){
   }
 });
     
-  setInterval(function(){
+  setInterval(function(){                                                     //server loop
     for(var i in SOCKET_LIST)
     {
-      var socket = SOCKET_LIST[i];
+      var socket = SOCKET_LIST[i];                                            //loops through all connected sockets and checks if any of them have any associated Game object
       if(socket.gameCreated)
       {
         var game = GAME_LIST[socket.id];
-        if(!game.gameOver)
+        if(!game.gameOver)                                                    //if a game exists and it isnt over, game loop for this frame of this game commences
         {
           game.tick++;
 
-          if(game.tick >= 6000)
-          {
-            game.zDifficultyMultiplier += 0.1;
+          if(game.tick >= 6000)                                               //tick to keep displayed game clock even with loop
+          {                                                                   //TODO get rid of magic number
+            game.zDifficultyMultiplier += 0.1;                                //temp difficult adjustment stuff
             if(game.spawnRate > 1)
             {
               game.spawnRate--;
@@ -1034,29 +1030,29 @@ io.sockets.on('connection', function(socket){
             }
           }
 
-          game.randomizer = Math.random() - 0.5;                       //creates a random number between -0.5 and 0.5 to randomize various processes
-                                                              //TODO refactor into function. maybe move into cleanup loop    
-          game.cleanUpLoop();                                          //removes non-player objects from their arrays for gabage collection when off screen 
+          game.randomizer = Math.random() - 0.5;                             //creates a random number between -0.5 and 0.5 to randomize various processes
+                                                                             //TODO refactor into function. maybe move into cleanup loop    
+          game.cleanUpLoop();                                                //removes non-player objects from their arrays for gabage collection when off screen 
   
           game.spawnClock++
-                                                  //temporary spawner delay to increase difficulty
+                                                                             //temporary spawner delay to increase difficulty
           if(game.spawnClock==game.spawnRate)                               
           {
-            game.spawnerLoop();                                        //loop that creates various game objects that are not the player
-            game.spawnClock = 0;                                       //nor a player missile
+            game.spawnerLoop();                                              //loop that creates various game objects that are not the player nor a player missile
+            game.spawnClock = 0;                                            
           }
-          game.handleInput(game.pressedKeys1,game.player);
-          if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}       //LEFT OFF HERE!!!
+          game.handleInput(game.pressedKeys1,game.player);                   //adjusts player information based on input data receive from client
+          if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}
 
-          game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);                          //update of all game objects
-                                                              //TODO refactor collision process        
-          game.collisionLoop();                                        //collision calculations among all collidable game objects that arent player or player weapons
+          game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);//update of all game objects
+                                                                             //TODO refactor collision process        
+          game.collisionLoop();                                              //collision calculations among all collidable game objects that arent player or player weapons
   
-          game.moveInZLoop();                                          //moves objects between canvas layers based on their z value
+          game.moveInZLoop();                                                //moves objects between layers based on their z value
   
-          game.viewUpdate();
-
-          socket.emit('playerLayer', game.playerObjects);
+          game.viewUpdate();                                                 //updates varaibles having to do with UI on the client
+                                                                             //TODO rename
+          socket.emit('playerLayer', game.playerObjects);                    //send data packages to the client(s)
           socket.emit('objectLayers', game.layerObjects);
           socket.emit('viewLayer', game.viewPackage);
           if(game.isTwoPlayerGame)
@@ -1066,17 +1062,16 @@ io.sockets.on('connection', function(socket){
             SESSION_LIST[socket.id].socket2.emit('viewLayer', game.viewPackage2);
           }
         }
-        else if(!socket.gameOverSent)
+        else if(!socket.gameOverSent)                                        //when game is over on server, send signal to client(s)
         {
           socket.emit('gameOver');
           if(game.isTwoPlayerGame){SESSION_LIST[socket.id].socket2.emit('gameOver');}
           socket.gameOverSent = true;
-           //do game over stuff
-        }                                                           //TRANSMIT DATA TO CLIENT
+        }                                                           
       }
     }
   },serverIntervalTime);
-
+//although most heavily altered or original, some of this script is from YouTube tutorials by YT user ScriptersWar, specifically the "Create Your Own HTML5 Multiplayer Game" series.
 
 
 

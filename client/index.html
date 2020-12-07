@@ -6,60 +6,61 @@
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
     <script type="text/javascript" src="/client/js/playArea.js"></script>
     <script type="text/javascript" src="/client/js/view.js"></script>
-    <script>
-      var socket = io();                                              
+    <script>                                                                            //necessary client variables
+      var socket = io();                                                                //connects to socket on the server
       var numCanvases = 16;                                          
       var canvasBag = [];                                            
-      var contextBag = [];                                           //TODO   address sluggishness and framerate
+      var contextBag = [];                                                              //TODO address sluggishness and framerate
       var layerObjects = [];                                         
       var player;
       var player2;
       var playerObjects = [];                                        
-      var patientHealth = 1000;
+      var patientHealth = 1000;                                                         //dispplay related stuff
       var intervalTime = 20;
       var ticks = 0;
       var secs = 0;
       var mins = 0;
-      var serverAccept = false;
+      var serverAccept = false;                                                         //server connection flags and handling
       var server2init = false;
       var serverAccept2 = false;
       var myInterval
-      var playerLayerReceived = false;
+      var playerLayerReceived = false;                                                  //checks to see if information has arrived from the server in a timely manner
+      var objectLayerReceived = false;
       var keyDownCheck = false;
-      var mouseDownCheck = false;
+      var mouseDownCheck = false;                                                       //input related
       var pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false};                                               
 
       //signin stuff
     
-      function drawPlayer(context, player)
+      function drawPlayer(context, player)                                              //function for handling and drawing the various players onto their respective layers
       {
         var playerContext = context;
         playerContext.save();
-        playerContext.translate(player.xPos, player.yPos);                               //move player canvas to new position
-        playerContext.fillStyle = '#FFAA00';                                         //draw player thruster graphic 
-        playerContext.beginPath();                                                   //TODO only draw when player is imparting thrust
+        playerContext.translate(player.xPos, player.yPos);                              //move player canvas to new position
+        playerContext.fillStyle = '#FFAA00';                                            //draw player thruster graphic 
+        playerContext.beginPath();                                                      //TODO only draw when player is imparting thrust
         playerContext.arc(player.FirePointX/-2, player.FirePointY/-2, 14, 0, 2*Math.PI);
         playerContext.fill();
-        playerContext.fillStyle = '#0000FF';                                         //draw player fire point graphic
+        playerContext.fillStyle = '#0000FF';                                            //draw player fire point graphic
         playerContext.beginPath();
         playerContext.arc(player.FirePointX, player.FirePointY, 4, 0, 2*Math.PI);
         playerContext.fill();
-        playerContext.rotate(player.angle);                                            //rotate canvas to the player's rotation 
-        playerContext.fillStyle = '#00FF00';                                         //draw main body of player object
-        playerContext.beginPath();                                                   //canvas is translated and rotated. player object
-        playerContext.arc(0, 0, player.scale, 0, 2*Math.PI);                           //is rendered normally to make the player object
-        playerContext.fill();                                                        //appear to translate and rotate relative to
-        if(player.isColliding)                                                        //player view
+        playerContext.rotate(player.angle);                                             //rotate canvas to the player's rotation 
+        playerContext.fillStyle = '#00FF00';                                            //draw main body of player object
+        playerContext.beginPath();                                                      //canvas is translated and rotated. player object
+        playerContext.arc(0, 0, player.scale, 0, 2*Math.PI);                            //is rendered normally to make the player object
+        playerContext.fill();                                                           //appear to translate and rotate relative to
+        if(player.isColliding)                                                          //player view
           {
-              playerContext.fillStyle = '#FF0000';                                       //recolors player object on collision to indicate
-              playerContext.beginPath();                                                 //to the player that a collision has occurred
+              playerContext.fillStyle = '#FF0000';                                      //recolors player object on collision to indicate
+              playerContext.beginPath();                                                //to the player that a collision has occurred
               playerContext.arc(0, 0, this.scale, 0, 2*Math.PI);     
               playerContext.fill();
           }
         playerContext.restore();
       }
 
-      function init()                                                //game intro screen
+      function init()                                                                   //game intro screen
       {
         var introTxt = "";                                           
         introTxt += "<div style='text-align: center; width: 100%'>";
@@ -91,14 +92,14 @@
         introTxt += "</div><br>";
         introTxt += "<div><div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here for 1 player</div>";
         introTxt += "<div id='tempStart2' style='text-align: center; width: 15%; background-color: orange; margin: auto;'>click here for 2 player</div></div>";
-        document.getElementById("parent").innerHTML = introTxt;                           //display intro text in div found in index  
+        document.getElementById("parent").innerHTML = introTxt;                                             //display intro text in div found in index  
         document.getElementById("tempStart").addEventListener('click', requestGameStart, false);
         document.getElementById("tempStart2").addEventListener('click', requestTwoPlayerGameStart, false);
         console.log("init page loaded");
-          //initialize game when start is clicked
+        //initialize game session when start is clicked
       }
 
-      function requestGameStart()
+      function requestGameStart()                                                                           //Let server know that client is ready to start 1-player game                                                               
       {
         if(!serverAccept)
         {
@@ -112,7 +113,7 @@
         }
       }
 
-      function requestTwoPlayerGameStart()
+      function requestTwoPlayerGameStart()                                                                  //Let server know that client is ready to start 2-player game
       {
         if(!serverAccept2)
         {
@@ -126,75 +127,75 @@
         }
       }
       
-      socket.on("gameStarted", function(){
-        serverAccept = true;
+      socket.on("gameStarted", function(){                                                                  //Start game loop on client when signal received from server that the game is
+        serverAccept = true;                                                                                //running on the server
         initGame();
       });
 
-      socket.on("twoPlayerSessionStarted", function(){
-        server2init = true;
+      socket.on("twoPlayerSessionStarted", function(){                                                      //acknowledges that a 2-player session has started on the server and puts
+        server2init = true;                                                                                 //client into a wait state until 2nd player is available
         document.getElementById("parent").innerHTML = "game session started. waiting for 2nd player";
       });
 
-      socket.on("twoPlayerGameStarted", function(){
-        serverAccept2 = true;
+      socket.on("twoPlayerGameStarted", function(){                                                         //acknowledges that a 2-player game is running in the previous started 2-player
+        serverAccept2 = true;                                                                               //session.  Beings game loop on client.
         initGame()
       });
 
-      socket.on("serverFull", function(){
-        document.getElementById("parent").innerHTML = "server full. please wait for game to start";
-        requestGameStart();
+      socket.on("serverFull", function(){                                                                   //Server capacity is preliminarily set at 10 sockets.  This signal lets the client know
+        document.getElementById("parent").innerHTML = "server full. please wait for game to start";         //that the server is at capacity and puts the client in a wait state.  Wait state will
+        requestGameStart();                                                                                 //continually ping the server to check for openings until there is one.
       });
 
       socket.on("serverFull2", function(){
-        document.getElementById("parent").innerHTML = "server full. please wait for game to start";
+        document.getElementById("parent").innerHTML = "server full. please wait for game to start";         //Similar to serverFull above, but for 2-player sessions     
         requestTwoPlayerGameStart();
       });
 
-      socket.on("sessionHostDropped", function(){
-        serverAccept2 = false;
+      socket.on("sessionHostDropped", function(){                                                           //signal to client if the 2-player session host has disconnected mid-game
+        serverAccept2 = false;                                                                              //puts the client in an end game state, and enables the client to start a new game  
         clearInterval(myInterval);
         console.log("game over socket:" + socket.id);
         postGame();
       });
 
-      socket.on("sessionAbandoned", function(){
-        serverAccept2 = false;
+      socket.on("sessionAbandoned", function(){                                                             //signal to client if the player in a 2-player session that is not hosting has disconnected mid-game
+        serverAccept2 = false;                                                                              //puts the client in an end game state, and enables the client to start a new game
         clearInterval(myInterval);
         console.log("game over socket:" + socket.id);
         postGame();
       });
   
-      function initGame()                                          //creates conditions necessary for building the game
+      function initGame()                                                                                   //creates conditions necessary for building the game
       { 
         console.log("initGame function accessed");                                                           
-        playArea.makeCanvasTags(numCanvases);                      //makes all the canvases and arrays to hold canvas drawn  
-        playArea.makeCanvases(numCanvases);                        //objects of an amount which is a power of 2
-        playArea.makeContexts(numCanvases);                        //due to the way color transitions are handled
+        playArea.makeCanvasTags(numCanvases);                                                               //creates canvas and canvas contexts and places the into array where they can be accessed  
+        playArea.makeCanvases(numCanvases);                                                                 
+        playArea.makeContexts(numCanvases);                                                                 
         playArea.linkContexts(numCanvases);                                
-        playArea.makePlayerLayer();
+        playArea.makePlayerLayer();                                                                         //sets up special display layers for objects that arent "enemies"
         playArea.makePlayer2Layer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();
-        document.getElementById("parent").removeEventListener('click', requestGameStart, false);    //change listeners for mouse input from menu to gameplay
-        document.getElementById("parent").style.cursor = "none";                                    //no visible cursor
+        document.getElementById("parent").removeEventListener('click', requestGameStart, false);            //change listeners for mouse input from menu to gameplay
+        document.getElementById("parent").style.cursor = "none";                                            //no visible cursor
         document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        
-        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);          
+        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);                 //continuous handling off input outside of the game loop
         document.addEventListener('keydown', keyDownHandler, false);                                 
         document.addEventListener('keyup', keyUpHandler, false);
-        myInterval = setInterval(gameLoop, intervalTime)
-        function gameLoop(){
-              if(!mouseDownCheck)
-              { pressedKeys["m"] = false; }
-              socket.emit('playerInput', pressedKeys);
+        myInterval = setInterval(gameLoop, intervalTime)                                                    //creates interval which will hold the update loop. This is a major change from the previous version    
+        function gameLoop(){                                                                                //which recursively called a client function.  Needed to abandon that so that I could move the game 
+              if(!mouseDownCheck)                                                                           //loop to the server to facilitate multiplayer games
+              { pressedKeys["m"] = false; }                                                                 //mouse check constrains mouse clicks to the update loop, allowing no more than one projectile
+              socket.emit('playerInput', pressedKeys);                                                      //fired per frame
               mouseDownCheck = false;
-              playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);
+              playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);  //clear "special" canvas to ready for update during current frame
               playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
               playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
-              if(!playerLayerReceived)
-              {
-                var i = 1;
-                if(!server2init && serverAccept2){handleInput(player2);}
+              if(!playerLayerReceived)                                                                      //checks for reception of package from server.  If missed, the client recalculates positions of
+              {                                                                                             //various objects based on the previous frame's information.  Meant to fill in very short gaps
+                var i = 1;                                                                                  //caused by occasional latency to and from server.
+                if(!server2init && serverAccept2){handleInput(player2);}                                    
                 else{handleInput(player);}
                 updatePlayer(player);
                 if(serverAccept2)
@@ -214,17 +215,17 @@
               {
                 for(var i = 0; i < layerObjects.length; i++)
                 {
-                  if(layerObjects[i].xVel != 0){layerObjects[i].xVel*=0.999;}                                            //friction, slowing velocity in all directions over time
+                  if(layerObjects[i].xVel != 0){layerObjects[i].xVel*=0.999;}                                            
                   if(layerObjects[i].yVel != 0){layerObjects[i].yVel*=0.999;}
                   if(layerObjects[i].zVel != 0){layerObjects[i].zVel*=0.999;}	
-                  layerObjects[i].yVel += 0.1;                                                                //simulates blood flow, moving objects toward bottom screen
-                  layerObjects[i].xPos += layerObjects[i].xVel*intervalTime/1000;                                                  //position updated by velocity during that frame
-                  layerObjects[i].yPos += layerObjects[i].yVel*intervalTime/1000;                                                  //in each spatial direction
+                  layerObjects[i].yVel += 0.1;                                                                
+                  layerObjects[i].xPos += layerObjects[i].xVel*intervalTime/1000;                                                  
+                  layerObjects[i].yPos += layerObjects[i].yVel*intervalTime/1000;                                                  
                   layerObjects[i].zPos += layerObjects[i].zVel*intervalTime/1000;
                 }
               }
               objectLayerReceived = false;
-              drawPlayer(playArea.playerContext, player);
+              drawPlayer(playArea.playerContext, player);                                                  //draw player(s) and player projectiles based on most current player information
               var m = 1;
               if(serverAccept2)
               {
@@ -239,31 +240,31 @@
                 playArea.weaponsContext.fill();
               }                    
 
-              for(var i = 0; i < contextBag.length; i++)
+              for(var i = 0; i < contextBag.length; i++)                                                   //clears gameplay object canvas contexts for current frame update
               {
                   contextBag[i].clearRect(0,0,canvasBag[i].width,canvasBag[i].height);
               }
-              for(var i=0; i < layerObjects.length; i++)
+              for(var i=0; i < layerObjects.length; i++)                                                   //draw gameplay objects based on most current information
               {
                 var group = layerObjects[i];
                 for(var j=0; j < group.length; j++)
                 {
-                  if(i == [numCanvases-1])                                       //in the appropriate color 
+                  if(i == [numCanvases-1])                                        
                   {
                     contextBag[i].fillStyle = '#440033';
                   }
                   else
                   {
-                    var num = (256/numCanvases)*(16-i);                                              //non-player objects are purple when they are on
-                    var color = '#' + num.toString(16) + '0000';                                //the same canvas as the player(s) and can collide
-                    contextBag[i].fillStyle = color;                                             //with them 
+                    var num = (256/numCanvases)*(16-i);                                                     //non-player objects are purple when they are on the same canvas as the player(s) and can collide
+                    var color = '#' + num.toString(16) + '0000';                                            //with them.  The rest are various shades of red determined by the layer they reside on 
+                    contextBag[i].fillStyle = color;                                                         
                   }
-                  contextBag[i].beginPath();                                                         //draw circle representing blood vessel in blood stream                         
+                  contextBag[i].beginPath();                                                                //draw circle representing blood vessel in blood stream                         
                   contextBag[i].arc(group[j].xPos, group[j].yPos, group[j].scale, 0, 2*Math.PI);
                   contextBag[i].fill();
                 }
               }
-              view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);
+              view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);                       //clear and update UI
               view.updateUI();
               playerLayerReceived = false;
               objectLayerReceived = false;
@@ -272,22 +273,22 @@
 
       function updatePlayer(object)
       {
-        object.xVec = Math.sin(object.angle);                                           //calculate forward vector based on
-        object.yVec = Math.cos(object.angle);                                           //player character object's rotation
-        object.FirePointX=object.xVec*object.scale;                                       //calculate position of fire point
-        object.FirePointY=object.yVec*object.scale*(-1);                                  //based on forward vector    
-        if(object.xVel != 0){object.xVel*=0.99;}                                        //friction
+        object.xVec = Math.sin(object.angle);                                                             //calculate forward vector based on
+        object.yVec = Math.cos(object.angle);                                                             //player character object's rotation
+        object.FirePointX=object.xVec*object.scale;                                                       //calculate position of fire point
+        object.FirePointY=object.yVec*object.scale*(-1);                                                  //based on forward vector    
+        if(object.xVel != 0){object.xVel*=0.99;}                                                          //friction
         if(object.yVel != 0){object.yVel*=0.99;}
-        object.yVel += 0.003;                                                         //effect of blood flow on players
+        object.yVel += 0.003;                                                                             //effect of blood flow on players
         var speedRatio = ((object.xVel*object.xVel)+(object.yVel*object.yVel))/object.MAX_MAG;
-        if(speedRatio>1)                                                            //cap forward speed to MAX_MAG
+        if(speedRatio>1)                                                                                  //cap forward speed to MAX_MAG
         {
           object.xVel/=speedRatio;
           object.yVel/=speedRatio;
         }
-        object.xPos+=object.xVel;                                                       //position updated by velocity
+        object.xPos+=object.xVel;                                                                         //position updated by velocity
         object.yPos+=object.yVel;
-        if(object.xPos<object.scale)                                                    //keeps player object in the play area
+        if(object.xPos<object.scale)                                                                      //keeps player object in the play area
         {
           object.xPos=object.scale;
           object.xVel*=-0.5;
@@ -309,65 +310,65 @@
         }
       }
 
-      function handleInput(targetplayer)                                           //KEEP ON SERVER SIDE IN CONTROLLER HANDLER, LOOP THROUGH EACH PLAYER
+      function handleInput(targetplayer)                                                                  //translates input data to a keyword pair object that can be sent to the server
       {
         if(!pressedKeys || pressedKeys == null)
         { 
           pressedKeys = {"a":false,"d":false,"s":false, "w":false, "m":false}; 
         }
-        if(pressedKeys["a"]&&pressedKeys["d"]&&pressedKeys["w"])         //forward no rotation when a,d,w pressed
+        if(pressedKeys["a"]&&pressedKeys["d"]&&pressedKeys["w"])                                          //forward no rotation when a,d,w pressed
         {
           targetplayer.xVel += 0.01*targetplayer.FirePointX;
           targetplayer.yVel += 0.01*targetplayer.FirePointY;    
         }
-        else if(pressedKeys["a"]&&pressedKeys["w"])                      //forward and rotate left when a,w pressed
+        else if(pressedKeys["a"]&&pressedKeys["w"])                                                       //forward and rotate left when a,w pressed
         {
           targetplayer.angle -= 0.05;
           targetplayer.xVel += 0.01*targetplayer.FirePointX;
           targetplayer.yVel += 0.01*targetplayer.FirePointY; 
         }                                 
-        else if(pressedKeys["d"]&&pressedKeys["w"])                      //forward and rotate right when d,w, pressed
+        else if(pressedKeys["d"]&&pressedKeys["w"])                                                       //forward and rotate right when d,w, pressed
         {
           targetplayer.angle += 0.05;
           targetplayer.xVel += 0.01*targetplayer.FirePointX;
           targetplayer.yVel += 0.01*targetplayer.FirePointY;
         }
-        else if(pressedKeys["a"]&&pressedKeys["s"])                     //backward and rotate left when a,s, pressed
+        else if(pressedKeys["a"]&&pressedKeys["s"])                                                       //backward and rotate left when a,s, pressed
         {
           targetplayer.angle -= -0.02;
           targetplayer.xVel -= 0.001*targetplayer.FirePointX;
           targetplayer.yVel -= 0.001*targetplayer.FirePointY;
         }                                                       
-        else if(pressedKeys["d"]&&pressedKeys["s"])                     //backward and rotate right when d,s, pressed
+        else if(pressedKeys["d"]&&pressedKeys["s"])                                                       //backward and rotate right when d,s, pressed
         {
           targetplayer.angle += 0.02;
           targetplayer.xVel += 0.001*targetplayer.FirePointX;
           targetplayer.yVel += 0.001*targetplayer.FirePointY; 
         }                                                       
-        else if(pressedKeys["a"])                                       //rotate left when a only pressed
+        else if(pressedKeys["a"])                                                                         //rotate left when a only pressed
         {
           targetplayer.angle -= 0.1;
         }
-        else if(pressedKeys["d"])                                       //rotate right when d only pressed
+        else if(pressedKeys["d"])                                                                         //rotate right when d only pressed
         {
           targetplayer.angle += 0.1;
         }
-        else if(pressedKeys["s"])                                       //backward when s only pressed
+        else if(pressedKeys["s"])                                                                         //backward when s only pressed
         {
           targetplayer.xVel -= 0.001*targetplayer.FirePointX;
           targetplayer.yVel -= 0.001*targetplayer.FirePointY;               
         }
-        else if(pressedKeys["w"])                                       //forward when w only pressed
+        else if(pressedKeys["w"])                                                                         //forward when w only pressed
         {
           targetplayer.xVel += 0.01*targetplayer.FirePointX;
           targetplayer.yVel += 0.01*targetplayer.FirePointY;             
         }
       }
 
-      function postGame()
-      {
+      function postGame()                                                                                 //puts the client into a state that enables restart once a game has ended or a 2-player game session
+      {                                                                                                   //has been abandoned
         var postText = "";
-        document.getElementById("parent").style.cursor = "auto";                            //no visible cursor
+        document.getElementById("parent").style.cursor = "auto";                                          //no visible cursor
         document.getElementById("parent").removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);
         document.getElementById("parent").removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);
         document.removeEventListener('keydown', keyDownHandler, false);                            
@@ -375,21 +376,21 @@
         postText += "<div style='text-align: center; width: 100%'>You Lose!</div>";
         postText += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to restart</div>"
         postText += "<div style='text-align: center; width: 100%'>or close browser tab to quit.</div>";
-        document.getElementById("parent").innerHTML = postText;                           //display intro text in div found in index  
+        document.getElementById("parent").innerHTML = postText;                                           //display intro text in div found in index  
         document.getElementById("tempStart").addEventListener('click', restartGame, false);
       }
 
-      function restartGame()
-      {
+      function restartGame()                                                                              //send client from end of game state back to the game intro screen. temp solution.
+      {                                                                                                   //TODO handle this automatically without unnecessary extra button press
           document.getElementById("tempStart").removeEventListener('click', restartGame, false);
           if(server2init){socket.emit("sessionReset")}
           else{socket.emit('endGame');}
           server2init = false;
           init();
       }
-      //game stuff
+    
 
-      function keyUpHandler(e)                                          //manually tracks when certain keys are not pressed
+      function keyUpHandler(e)                                                                            //tracks when certain keys are not pressed
       {                                                        
         if(e.key == "a"){ pressedKeys["a"] = false; }
         else if(e.key == "d"){ pressedKeys["d"] = false; }
@@ -397,7 +398,7 @@
         else if(e.key == "w"){ pressedKeys["w"] = false; }
       }
 
-      function keyDownHandler(e)                                        //manually tracks when certain keys are pressed
+      function keyDownHandler(e)                                                                          //tracks when certain keys are pressed
       {                                                        
         if(e.key == "a"){ pressedKeys["a"] = true; }
         else if(e.key == "d"){ pressedKeys["d"] = true; }
@@ -406,35 +407,38 @@
         keyDownCheck = true;                                                    
       }
 
-      socket.on('playerLayer', function(data){
+      socket.on('playerLayer', function(data){                                                            //controls what the client does when a playerLayer package has arrived from the server
         if(data)
         {
-          playerObjects = data;
+          playerObjects = data;                                                                           //overwrites playerObjects array with new data and sets client player variable appropriately
           player = playerObjects[0];
           if(serverAccept2){player2 = playerObjects[1];}
           playerLayerReceived = true;
         }
         else{playerLayerReceived = false;}
       });
-      socket.on('objectLayers', function(data){
+
+      socket.on('objectLayers', function(data){                                                           //controls what the client does when a objectLayers package has arrived from the server
         if(data)
         {
-          layerObjects = data;
+          layerObjects = data;                                                                            //overwrites layerObjects array with new data
           objectLayerReceived = true;
         }
         else{objectLayerReceived = false;}
       });
-      socket.on('viewLayer', function(data){
+
+      socket.on('viewLayer', function(data){                                                              //controls what the client does when a viewLayer package has arrived from the server
         if(data)
         {
-          view.playerScore = data.playerScore;
+          view.playerScore = data.playerScore;                                                            //updates view layer variables with new information from the server
           view.multiplier = data.multiplier;
           patientHealth = data.patientHealth;
         }
         else{console.log("no view layer data in package");}
       });
-      socket.on('gameOver', function(){
-        clearInterval(myInterval);
+
+      socket.on('gameOver', function(){                                                                   //tells the client what to do when it has received a signal from the server that the current
+        clearInterval(myInterval);                                                                        //game session on the server has ended
         console.log("game over socket:" + socket.id);
         postGame();
       });       
@@ -459,19 +463,18 @@
     -->
     <div id = "errorMessage" style = "color: red;"></div>
     <script>
-
-      var signDiv = document.getElementById("signDiv");
+      var signDiv = document.getElementById("signDiv");                                                  //sign in and sign up screen           
       var signDivUsername = document.getElementById("signDiv-username");
       var signDivSignIn = document.getElementById("signDiv-signIn");
       var signDivSignUp = document.getElementById("signDiv-signUp");
       var signDivPassword = document.getElementById("signDiv-password");
 
-      function isValidFormInput(data)
+      function isValidFormInput(data)                                                                    //super simple format check. will update to much more stringent regex checks in later versions.
       {
           return data.length >= 4;
       }
 
-      signDivSignIn.onclick = function(){
+      signDivSignIn.onclick = function(){                                                                //handles sign in data and sends it to the server if applicable 
         if(isValidFormInput(signDivUsername.value) && isValidFormInput(signDivPassword.value))
         {
           document.getElementById("errorMessage").innerHTML = "";
@@ -485,13 +488,13 @@
         }
       };
 
-      signDivSignUp.onclick = function(){
+      signDivSignUp.onclick = function(){                                                               //handles sign up data and sends it to the server if applicable
         socket.emit('signUp', {
           username : signDivUsername.value,
           password : signDivPassword.value});
       };
 
-      socket.on('signInResponse', function(data){
+      socket.on('signInResponse', function(data){                                                       //handles response from server concerning the sign in data
         if(data.success){
           signDiv.innerHTML = "";
           init();
@@ -502,8 +505,8 @@
         }
       });
 
-      socket.on('signUpResponse', function(data){
-        if(data.success)
+      socket.on('signUpResponse', function(data){                                                       //handles response from server concerning the sign in data
+        if(data.success)                                                                                //currently a bug here where sign up success message does not display
         {
           document.getElementById("errorMessage").innerHTML = "please sign in with your newly created user name and password";
         }
@@ -512,8 +515,8 @@
           document.getElementById("errorMessage").innerHTML = "user name is not available. try another.";
         }
       });
-
-      var chatText = document.getElementById('chat');
+      /*
+      var chatText = document.getElementById('chat');                                                   //unused script for future chat function capability
       var chatInput = document.getElementById('chat-input');
       var chatForm = document.getElementById('chat-form');
       var DEBUG = false;
@@ -521,7 +524,7 @@
       socket.on('addToChat', function(data){
         chat.innerHTML =+ '<div>' + data + '</div>';
       });
-      /*
+      
       chatForm.onsubmit = function(e){
         e.preventDefault();
         if(chatInput.value[0] === '/')
