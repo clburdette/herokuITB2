@@ -1,0 +1,137 @@
+1-player game over
+
+Server: socket emit 'gameOver'
+Client: clear game loop, run postGame function
+	postGame(): remove game listeners, displayer post game page,
+			activate post game page listeners. 
+			on click run restartGame function
+	restartGame(): remove post game page listeners, emit 'endGame' to server
+			server2init variable = false
+			run init function
+	init(): display intro text, enable intro listeners
+		on click start one or two player game
+Server: delete game, decrement activeGames, reset socket to default
+
+2-player game over
+
+Server: socket emit 'gameOver'
+Client: clear game loop, run postGame function 
+	postGame(): remove game listeners, displayer post game page,
+			activate post game page listeners. 
+			on click run restartGame function
+	restartGame(): remove post game page listeners, emit 'sessionReset' to server 
+			server2init variable = false
+			run init function
+	init(): display intro text, enable intro listeners
+		on click start one or two player game
+Server: reset socket, session host deletes game, session, decrements activeGames and activeSessions
+
+2-player host drop out
+
+Server: emit 'sessionHostDropped' on guest socket, delete game and session,
+	decrement active Games,Sessions,TwoPlayerGames, delete host user, delete host socket
+Client: serverAccept2 = false, clear game loop, run postGame function
+	postGame(): remove game listeners, displayer post game page,
+			activate post game page listeners. 
+			on click run restartGame function
+	restartGame(): remove post game page listeners, emit 'sessionReset' to server 
+			server2init variable = false
+			run init function
+	init(): display intro text, enable intro listeners
+		on click start one or two player game
+Server: reset guest socket
+
+2-player guest drop out
+
+Server: emit 'sessionAbandoned' on host socket, remove guest from session
+	decrement activeTwoPlayerGames, delete guest user, delete guest socket
+Client: serverAccept2 = false, clear game loop, run postGame function
+	postGame(): remove game listeners, displayer post game page,
+			activate post game page listeners. 
+			on click run restartGame function
+	restartGame(): remove post game page listeners, emit 'sessionReset' to server 
+			server2init variable = false
+			run init function
+	init(): display intro text, enable intro listeners
+		on click start one or two player game
+Server: reset host socket, session host deletes game, session, decrements activeGames and activeSessions
+
+
+What I Want:
+
+1-player game over
+
+Server: emit gameOver, place game and session in a post-game wait state
+Client: place game in post game state and provide options to start new one or two player game
+	on select emit to server, elevate client to wait to restart state
+Server1: selected 1-player delete game, reset session, create new game, emit to client
+Server2: selected 2-player delete game, reset session to host or delete session to guest, emit to client
+	decrement activeSinglePlayersGames, decrement activeSession if applicable, increment activeTwoPlayersGames
+	if applicable
+Client: start new game
+
+1-player quit game
+
+Client: place game in post game state, emit to server
+Server: delete game, delete session emit to client
+	decrement activeGames, SinglePlayerGames, Sessions
+Client: load init screen
+
+2-player host drop
+
+Server: remove host from session. change ownership of game and session. pause game. emit to guest client. 
+	decrement activeTwoPlayerGames
+Client: pause game. notify guest that host dropped. provide options to continue as single player or start new game
+Server1: selected continue. reconfigure game as 1-player. unpause game. emit to client.
+ 	 increment active singlePlayerGames
+Server2: selected new game. delete game, session. emit to client. decrement activeGames, Sessions
+Client1: reconfigure game as 1-player with host drop. unpause game.
+Client2: load init screen
+
+2-player host quit
+
+HostClient: place game in post game state, emit from host to server
+Server: remove host from session. change ownership of game and session.pause game. reset host socket. emit to both. 
+	decrement activeTwoPlayerGames.
+HostClient: load init screen
+GuestClient: pause game. notify guest that host quit. provide options to continue as single player or start new game
+Server1: selected continue. reconfigure game as 1-player. unpause game. emit to client.
+ 	 increment active singlePlayerGames
+Server2: selected new game. delete game, session. emit to client. decrement activeGames, Sessions
+Client1: reconfigure game as 1-player with host drop. unpause game.
+Client2: load init screen
+  
+2-player guest drop
+
+Server: remove guest from session, decrement activeTwoPlayerGames, emit to host
+Client: pause game. notify host that guest dropped. provide options to continue as single player or start new game
+Server1: selected continue. reconfigure game as 1-player. unpause game. emit to client.
+ 	 increment active singlePlayerGames
+Server2: selected new game. delete game, session. emit to client. decrement activeGames, Sessions
+Client1: reconfigure game as 1-player with guest drop. unpause game.
+Client2: load init screen
+
+2-player guest quit
+
+GuestClient: place game in post game state, emit from guest to server
+Server: remove guest from session. pause game. reset guest socket. emit to both. 
+	decrement activeTwoPlayerGames.
+GuestClient: load init screen
+HostClient: pause game. notify host that guest quit. provide options to continue as single player or start new game
+Server1: selected continue. reconfigure game as 1-player. unpause game. emit to client.
+ 	 increment active singlePlayerGames
+Server2: selected new game. delete game, session. emit to client. decrement activeGames, Sessions
+Client1: reconfigure game as 1-player with guest drop. unpause game.
+Client2: load init screen
+
+What I Need:
+
+server emit gameOver
+client side game wait state
+server side game wait state
+client restart screen/quit/future pause screen
+server transfer session to guest
+server notify 2nd party of 2-player game if 1st party drops/quits
+client notify guest of host drop/quit
+client/server continue busted 2-player as 1 player
+conditional pause menu

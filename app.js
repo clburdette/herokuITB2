@@ -43,7 +43,8 @@ class Game                                                                      
     this.patientHealth = 1000;                                                      //health score metric for display
     this.randomizer;                                                                //variable for randomizing various processes
     this.layerObjects = [];                                                         //non-player objects
-    this.gameOver = false;                                                          //game over flag
+    this.gameOver = false;
+    this.paused = false;                                                            //game over flag
     this.intervalTime = 20;                                                         //synch to time game loop for determining distances in reference to a single frame
     this.playerScore = 0;                                                           //player1's actual score
     this.playerScore2 = 0;                                                          //player2's actual score
@@ -56,14 +57,16 @@ class Game                                                                      
     this.pressedKeys1 = {"a":false,"d":false,"s":false, "w":false, "m":false};      //player1 latest input info received
     this.pressedKeys2 = {"a":false,"d":false,"s":false, "w":false, "m":false};      //player2 latest input info received
     this.viewPackage = {                                                            //player1 UI information package to be sent to client
-      playerScore : 0,                                          
+      playerScore : 0,                                                              //TODO run this info through a function that returns an object and then send
       multiplier : 1,
       patientHealth : 1000,
+      tick: 0
     };
     this.viewPackage2 = {                                                           //player2 UI information package to be sent to client                                              
       playerScore : 0,                                          
       multiplier : 1,
       patientHealth : 1000,
+      tick: 0
     };
 
     this.playerObjects.push(this.player);                                           //add player1 object to playerObjects array on Game instance creation
@@ -514,9 +517,9 @@ endGame()                                                                     //
     this.player.health = 0;
     gameOver = true;
   }
-  else if(this.player2.health <= 0)
+  else if(this.isTwoPlayerGame && this.player2.health <= 0)
   {
-    this.player2.health =0;
+    this.player2.health = 0;
     gameOver = true;
   }
   else if(this.patientHealth <= 0)                                            //game over if too many pathogens get past the player and infect the patient
@@ -533,9 +536,11 @@ endGame()                                                                     //
     this.viewPackage.playerScore = this.playerScore;
     this.viewPackage.multiplier = this.multiplier;
     this.viewPackage.patientHealth = this.patientHealth;
+    this.viewPackage.tick = this.tick;
     this.viewPackage2.playerScore = this.playerScore2;
     this.viewPackage2.multiplier = this.multiplier2;
     this.viewPackage2.patientHealth = this.patientHealth;
+    this.viewPackage2.tick = this.tick;
   }
   
   viewUpdate()                                                                //caps multipliers
@@ -748,6 +753,9 @@ var SESSION_LIST = {};
 var serverIntervalTime = 20;
 var connections = 0;
 var activeGames = 0;
+var activeSessions = 0;
+var activeSinglePlayerGames = 0;
+var activeTwoPlayerGames = 0;
 var twoPlayerOpenings = 0;
 var MAX_CONNECTIONS = 10;
 var DEBUG = false;
@@ -823,12 +831,19 @@ io.sockets.on('connection', function(socket){                                   
 
   function gameStartup()                                                          //creates new single player game
   {
-    var game = new Game(512, 384, false);
-    GAME_LIST[socket.id] = game;
+    var singlePlayerSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
+    singlePlayerSession.game = new Game(512, 384, false);
+    socket.currentSession = singlePlayerSession;
+    socket.hostingSession = true;
+    SESSION_LIST[socket.id] = singlePlayerSession;
+    GAME_LIST[socket.id] = singlePlayerSession.game;
+    console.log("game session created");
     console.log("game instance running");
     socket.gameCreated = true;
     socket.emit("gameStarted");
     activeGames++;
+    activeSessions++;
+    activeSinglePlayerGames++;
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
   }
@@ -842,61 +857,103 @@ io.sockets.on('connection', function(socket){                                   
     socket.hostingSession = true;
     socket.emit("twoPlayerSessionStarted");
     twoPlayerOpenings++;
+    activeSessions++;
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
   }
 
+  socket.on("gamePaused", function(){
+    if(GAME_LIST[socket.id])
+    {
+        GAME_LIST[socket.id].paused = true;
+        if(GAME_LIST[socket.id].isTwoPlayerGame)
+        {
+          socket.currentSession.socket2.emit("sessionAbandoned");
+        }
+    }
+    else
+    {
+      if(SESSION_LIST[socket.id])
+      {
+        console.log("error: game not found")
+      }
+      else
+      {
+        socket.currentSession.game.paused = true;
+        socket.currentSession.socket1.emit("sessionAbandoned");
+      }
+    }
+    console.log("game paused server side");
+  });
+
+  socket.on("continueGame", function(){
+    socket.currentSession.game.paused = false;
+  });
+
   socket.on("sessionReset", function(){                                           //resets socket after 2 player session has concluded
+    if(SESSION_LIST[socket.id])
+    {
+      delete GAME_LIST[socket.id];
+      delete SESSION_LIST[socket.id];
+      activeGames--;
+      activeSessions--;   
+    }
     socket.gameCreated = false;
-    delete GAME_LIST[socket.id];
-    activeGames--;
     socket.gameOverSent = false;
     socket.inTwoPlayerGame = false;
-    console.log("game ended");
-    delete SESSION_LIST[socket.id];
     socket.hostingSession = false;
     socket.currentSession = null;
+    console.log("game ended");
     console.log("session ended");
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
   });
 
   socket.on('disconnect', function(){                                             //things that occur when a player closes their browser window  
-    if(!GAME_LIST[socket.id])
+    if(!SESSION_LIST[socket.id])
     {
       if(socket.currentSession)                                                   //nullifies 2nd player portion of a session and notifies session host
-      {                                                                           //when player number2(guest) leaves early
-        //socket.currentSession.game.playerObjects.splice(1,1);
+      { 
+        /*                                                                          //when player number2(guest) leaves early
         socket.currentSession.game.isTwoPlayerGame = false;
         socket.currentSession.game.gameOver = true;
-        socket.currentSession.hasTwoPlayers = false;
         socket.currentSession.player2 = null;
         socket.currentSession.socket2 = null;
+        */
+        socket.currentSession.game.paused = true;
         socket.currentSession.socket1.emit("sessionAbandoned");
-        console.log("player 2 dropped out");
+        //console.log("player 2 dropped out");
+        //activeTwoPlayerGames--;
       }        
     }
     else
     {
-      if(GAME_LIST[socket.id].isTwoPlayerGame)                                    //ends game and session when session host drops out and notifies guest player                                 
+      if(SESSION_LIST[socket.id].hasTwoPlayers)                                    //ends game and session when session host drops out and notifies guest player                                 
       {
-        SESSION_LIST[socket.id].socket2.emit("sessionHostDropped");
+        socket.currentSession.game.paused = true;
+        SESSION_LIST[socket.id].socket2.emit("sessionAbandoned");
+        /*
         delete GAME_LIST[socket.id];
         delete SESSION_LIST[socket.id];
+        activeTwoPlayerGames--;
         console.log("2 player game deleted");
+        */
       }
       else                                                                        //ends single player game and removes it from game list  
       {
         delete GAME_LIST[socket.id];
+        delete SESSION_LIST[socket.id];
+        activeGames--;
+        activeSinglePlayerGames--;
         console.log("1 player game deleted");
       }
-      activeGames--;
+      //activeGames--;
+      //activeSessions--;
     }
     socket.gameOverSent = true;                                                   //logs and completes disconnection
     connections--;
     console.log("disconnection");
     console.log(connections + " connections active");
-    console.log(activeGames + " games active");
     delete USER_LIST[socket.id];
     delete SOCKET_LIST[socket.id];
   });
@@ -983,11 +1040,12 @@ io.sockets.on('connection', function(socket){                                   
     }
     socket.gameCreated = false;
     socket.hostingSession = false;
-    socket.gameOverSent = false;
     socket.inTwoPlayerGame = false;
     socket.currentSession = null;
     console.log(connections + " connections active");
     console.log(activeGames + " games active");
+    socket.emit("gameOver");
+    socket.gameOverSent = true;
   });
 
   socket.on('sendMsgToServer', function(data){                                //for planned chat feature
@@ -1010,68 +1068,74 @@ io.sockets.on('connection', function(socket){                                   
     for(var i in SOCKET_LIST)
     {
       var socket = SOCKET_LIST[i];                                            //loops through all connected sockets and checks if any of them have any associated Game object
-      if(socket.gameCreated)
+      if(socket.hostingSession)
       {
-        var game = GAME_LIST[socket.id];
-        if(!game.gameOver)                                                    //if a game exists and it isnt over, game loop for this frame of this game commences
+        var session = SESSION_LIST[socket.id];
+        var game = session.game
+        if(game)
         {
-          game.tick++;
-
-          if(game.tick >= 6000)                                               //tick to keep displayed game clock even with loop
-          {                                                                   //TODO get rid of magic number
-            game.zDifficultyMultiplier += 0.1;                                //temp difficult adjustment stuff
-            if(game.spawnRate > 1)
+          if(!game.gameOver)                                                    //if a game exists and it isnt over, game loop for this frame of this game commences
+          {
+            if(!game.paused)
             {
-              game.spawnRate--;
-              game.zDifficultyMultiplier += 0.1;
-              console.log(game.spawnRate);
-              game.tick = 0;
-              game.spawnClock = 0;
+              game.tick++;
+
+            if(game.tick >= 6000)                                               //tick to keep displayed game clock even with loop
+            {                                                                   //TODO get rid of magic number
+              game.zDifficultyMultiplier += 0.1;                                //temp difficult adjustment stuff
+              if(game.spawnRate > 1)
+              {
+                game.spawnRate--;
+                game.zDifficultyMultiplier += 0.1;
+                game.tick = 0;
+                game.spawnClock = 0;
+              }
             }
-          }
 
-          game.randomizer = Math.random() - 0.5;                             //creates a random number between -0.5 and 0.5 to randomize various processes
+            game.randomizer = Math.random() - 0.5;                             //creates a random number between -0.5 and 0.5 to randomize various processes
                                                                              //TODO refactor into function. maybe move into cleanup loop    
-          game.cleanUpLoop();                                                //removes non-player objects from their arrays for gabage collection when off screen 
+            game.cleanUpLoop();                                                //removes non-player objects from their arrays for gabage collection when off screen 
   
-          game.spawnClock++
+            game.spawnClock++
                                                                              //temporary spawner delay to increase difficulty
-          if(game.spawnClock==game.spawnRate)                               
-          {
-            game.spawnerLoop();                                              //loop that creates various game objects that are not the player nor a player missile
-            game.spawnClock = 0;                                            
-          }
-          game.handleInput(game.pressedKeys1,game.player);                   //adjusts player information based on input data receive from client
-          if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}
+            if(game.spawnClock==game.spawnRate)                               
+            {
+              game.spawnerLoop();                                              //loop that creates various game objects that are not the player nor a player missile
+              game.spawnClock = 0;                                            
+            }
+            game.handleInput(game.pressedKeys1,game.player);                   //adjusts player information based on input data receive from client
+            if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}
 
-          game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);//update of all game objects
+            game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);//update of all game objects
                                                                              //TODO refactor collision process        
-          game.collisionLoop();                                              //collision calculations among all collidable game objects that arent player or player weapons
+            game.collisionLoop();                                              //collision calculations among all collidable game objects that arent player or player weapons
   
-          game.moveInZLoop();                                                //moves objects between layers based on their z value
+            game.moveInZLoop();                                                //moves objects between layers based on their z value
   
-          game.viewUpdate();                                                 //updates varaibles having to do with UI on the client
+            game.viewUpdate();                                                 //updates varaibles having to do with UI on the client
                                                                              //TODO rename
-          socket.emit('playerLayer', game.playerObjects);                    //send data packages to the client(s)
-          socket.emit('objectLayers', game.layerObjects);
-          socket.emit('viewLayer', game.viewPackage);
-          if(game.isTwoPlayerGame)
-          {
-            SESSION_LIST[socket.id].socket2.emit('playerLayer', game.playerObjects);
-            SESSION_LIST[socket.id].socket2.emit('objectLayers', game.layerObjects);
-            SESSION_LIST[socket.id].socket2.emit('viewLayer', game.viewPackage2);
+            socket.emit('playerLayer', game.playerObjects);                    //send data packages to the client(s)
+            socket.emit('objectLayers', game.layerObjects);                    //TODO refactor this into a loop when going beyond 2 player session
+            socket.emit('viewLayer', game.viewPackage);
+            if(game.isTwoPlayerGame)
+            {
+              session.socket2.emit('playerLayer', game.playerObjects);
+              session.socket2.emit('objectLayers', game.layerObjects);
+              session.socket2.emit('viewLayer', game.viewPackage2);
+            }
           }
         }
         else if(!socket.gameOverSent)                                        //when game is over on server, send signal to client(s)
         {
-          socket.emit('gameOver');
-          if(game.isTwoPlayerGame){SESSION_LIST[socket.id].socket2.emit('gameOver');}
+          socket.emit('gameOver');                                           //TODO refactor into loop for more than 2 players
+          if(game.isTwoPlayerGame){session.socket2.emit('gameOver');}
           socket.gameOverSent = true;
-        }                                                           
+        }
+      }                                                           
       }
     }
   },serverIntervalTime);
-//although most heavily altered or original, some of this script is from YouTube tutorials by YT user ScriptersWar, specifically the "Create Your Own HTML5 Multiplayer Game" series.
+//although mostly heavily altered or original, some of this script is from YouTube tutorials by YT user ScriptersWar, specifically the "Create Your Own HTML5 Multiplayer Game" series.
 
 
 

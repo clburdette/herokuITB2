@@ -4,6 +4,7 @@ var playArea = {
 makeCanvasTags : function(amount)                          //create string containing all HTML canvas tags for placement in parent div tag
 {
   var temp = '';                                           //first canvas tag is a plain red background and no game objects are drawn onto it  
+  //temp += '<canvas id="canvas0" width="1024" height="768" style="border:1px solid lightgrey; background-color:red; position:absolute; left:0px; top:0px; z-index:1;"></canvas>';
   temp += '<canvas id="canvas0" width="1024" height="768" style="border:1px solid lightgrey; background-color:red; position:absolute; left:0px; top:0px; z-index:1;"></canvas>';
 
   for(var i=0; i < amount; i++)                            //loop to create various layers that the game objects are drawn onto 

@@ -1,0 +1,36 @@
+format:
+
+all tags of a type
+
+tagname{
+
+attribute: value;
+atrribute2: value;
+
+etc
+}
+
+class
+
+.classname{
+}
+
+tag type within a class
+
+.classname tagname{
+}
+
+states of tag type
+
+tagname:statename{
+
+not sure which tags have states
+
+}
+
+id
+
+#idname{
+}
+
+ 
