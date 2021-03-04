@@ -2,7 +2,8 @@ const { COPYFILE_FICLONE_FORCE } = require('constants');                        
 const { SERVFAIL } = require('dns');
 var express = require('express');                                                   //sets up express
 var fs = require('fs');
-var app = express();                                                                //creates express object and then links it to the client script
+var app = express();
+var mysql = require('mysql');                                                                //creates express object and then links it to the client script
 var serv = require('http').Server(app);
 
 app.get('/', function(req, res) {
@@ -99,12 +100,15 @@ spawnToCollide(spawnXPos,spawnYPos,sizeToSpawn,objects)                         
   {
     obj1 = objects[i];
     if(Math.abs(spawnXPos-obj1.xPos)<=(sizeToSpawn + obj1.scale))                   //rough distance check based on X position
-    {
-      var diffX = spawnXPos-obj1.xPos;
-      var diffY = spawnYPos-obj1.yPos;
-      var sqDistance= Math.pow(diffX,2) + Math.pow(diffY,2);                        //if near in X, check actual distance between objects, and compare to combined radius
-
-      if(sqDistance <= Math.pow(obj1.scale + sizeToSpawn,2)){willCollide = true;}
+    {                                                                                                                                           //if near in X, check actual distance between objects, and compare to combined radius
+      if(Math.abs(spawnYPos-obj1.Pos)<=(sizeToSpawn + obj1.scale))
+      {
+        if((Math.pow(spawnXPos-obj1.xPos,2) + Math.pow(spawnYPos-obj1.yPos,2)) <= Math.pow(obj1.scale + sizeToSpawn,2))
+        {
+          willCollide = true;
+          break;
+        }
+      }
     }
   }
 
@@ -316,7 +320,10 @@ detectCollision(objects)                                                        
     {
       if((Math.abs(objects[i].xPos-objects[j].xPos)) <= (objects[i].scale + objects[j].scale))
       {                                                                           //check to see if objects are near each other in X before doing more computationally heavy
-        this.collisionReaction(objects,i,j);                                      //checks for collision
+        if((Math.abs(objects[i].yPos-objects[j].yPos)) <= (objects[i].scale + objects[j].scale))
+        {
+          this.collisionReaction(objects,i,j);
+        }                                      //checks for collision
       }                                                                           //TODO double this up to check for Y
     }
   }
@@ -344,86 +351,90 @@ playerCollision(objects)                                                        
     {
       obj2 = objects[j];
       if((Math.abs(obj1.xPos-obj2.xPos)) <= (obj1.scale + obj2.scale))            //filters checks for collision based on X position
-      {                                                                           //TODO add Y position check as well.
-        var deltaX = obj2.xPos-obj1.xPos;
-        var deltaY = obj2.yPos-obj1.yPos;
-        var sqDistance= Math.pow(deltaX,2) + Math.pow(deltaY,2);
-        if(sqDistance <= (Math.pow(obj1.scale + obj2.scale,2)))                   //checks to see if the distance between two objects is less than equal to their combined radii
-        {                                                                         //thereby indicating a collision.
-          obj1.isColliding=true;                                                  //makes various physics calculations based on the parameters on the two objects in the collision
-          obj2.isColliding=true;                                                  //TO DO move into a function  
-          var vNorm = {x: deltaX/Math.sqrt(sqDistance), y: deltaY/Math.sqrt(sqDistance)};
-          var vRelVel = {x: obj1.xVel-obj2.xVel, y: obj1.yVel-obj2.yVel};
-          var speed = (vRelVel.x * vNorm.x) + (vRelVel.y * vNorm.y);
-          if (speed < 0){speed = 0;}
-          var impulse = 2* speed / ((obj1.scale*obj1.density) + (obj2.scale*obj2.density));
-          obj1.xVel -= (impulse*obj2.scale*obj2.density*vNorm.x);
-          obj1.yVel -= (impulse*obj2.scale*obj2.density*vNorm.y);
-          obj2.xVel += (impulse*obj1.scale*obj1.density*vNorm.x);
-          obj2.yVel += (impulse*obj1.scale*obj1.density*vNorm.y);                     
-          obj2.scale-=obj1.scale;
-          if(sqDistance/(Math.pow(obj1.scale + obj2.scale,2)) < 0.9)
-          {
-            var midPoint = {x: (obj2.xPos+obj1.xPos)/2, y: (obj2.yPos+obj1.yPos)/2};
-            var distOne = Math.pow((midPoint.x - obj1.xPos),2) + Math.pow((midPoint.y - obj1.yPos),2);
-            var distTwo = Math.pow((midPoint.x - obj2.xPos),2) + Math.pow((midPoint.y - obj2.yPos),2);
-            var vecOne = {x: (obj1.xPos - midPoint.x)/distOne, y: (obj1.yPos - midPoint.y)/distOne};
-            var vecTwo = {x: (obj2.xPos - midPoint.x)/distTwo, y: (obj2.yPos - midPoint.y)/distTwo};
-            obj1.xVel += (vecOne.x/obj1.scale)*1000;
-            obj1.yVel += (vecOne.y/obj1.scale)*1000;
-            obj2.xVel += (vecTwo.x/obj2.scale)*1000;
-            obj2.yVel += (vecTwo.y/obj2.scale)*1000;
-          }
-          if(this.isTwoPlayerGame)                                                //handles player scoring based one game type
-          {                                                                       //TODO refactor into something less messy  
-            if(i>1)
+      { 
+        if((Math.abs(obj1.yPos-obj2.yPos)) <= (obj1.scale + obj2.scale))
+        {                                                                          //TODO add Y position check as well.
+          var deltaX = obj2.xPos-obj1.xPos;
+          var deltaY = obj2.yPos-obj1.yPos;
+          var sqDistance= Math.pow(deltaX,2) + Math.pow(deltaY,2);
+          var collideTest = sqDistance/(Math.pow(obj1.scale + obj2.scale,2));
+          if(collideTest <= 1)                   //checks to see if the distance between two objects is less than equal to their combined radii
+          {                                                                         //thereby indicating a collision.
+            obj1.isColliding=true;                                                  //makes various physics calculations based on the parameters on the two objects in the collision
+            obj2.isColliding=true;                                                  //TO DO move into a function  
+            var vNorm = {x: deltaX/Math.sqrt(sqDistance), y: deltaY/Math.sqrt(sqDistance)};
+            var vRelVel = {x: obj1.xVel-obj2.xVel, y: obj1.yVel-obj2.yVel};
+            var speed = (vRelVel.x * vNorm.x) + (vRelVel.y * vNorm.y);
+            if (speed < 0){speed = 0;}
+            var impulse = 2* speed / ((obj1.scale*obj1.density) + (obj2.scale*obj2.density));
+            obj1.xVel -= (impulse*obj2.scale*obj2.density*vNorm.x);
+            obj1.yVel -= (impulse*obj2.scale*obj2.density*vNorm.y);
+            obj2.xVel += (impulse*obj1.scale*obj1.density*vNorm.x);
+            obj2.yVel += (impulse*obj1.scale*obj1.density*vNorm.y);                     
+            obj2.scale-=obj1.scale;
+            if(collideTest < 0.9)
             {
-              if(!this.endGame())
-              {
-                if(this.playerObjects[i].owner == this.player){this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;}
-                else if(this.playerObjects[i].owner == this.player2){this.playerScore2 += Math.ceil(1000/obj2.scale) * this.multiplier2;}
-              }
-              if(this.playerObjects[i].owner == this.player){this.multiplier++;}
-              else if(this.playerObjects[i].owner == this.player2){this.multiplier2++;}                                                                                  
-              this.playerObjects.splice(i,1);
-              if(obj2.scale > 60)
-              {                                                                   //large gameplay objects split in two when hit
-                var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
-                obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
-                objects.push(spawn);
-              }
+              var midPoint = {x: (obj2.xPos+obj1.xPos)/2, y: (obj2.yPos+obj1.yPos)/2};
+              var distOne = Math.pow((midPoint.x - obj1.xPos),2) + Math.pow((midPoint.y - obj1.yPos),2);
+              var distTwo = Math.pow((midPoint.x - obj2.xPos),2) + Math.pow((midPoint.y - obj2.yPos),2);
+              var vecOne = {x: (obj1.xPos - midPoint.x)/distOne, y: (obj1.yPos - midPoint.y)/distOne};
+              var vecTwo = {x: (obj2.xPos - midPoint.x)/distTwo, y: (obj2.yPos - midPoint.y)/distTwo};
+              obj1.xVel += (vecOne.x/obj1.scale)*1000;
+              obj1.yVel += (vecOne.y/obj1.scale)*1000;
+              obj2.xVel += (vecTwo.x/obj2.scale)*1000;
+              obj2.yVel += (vecTwo.y/obj2.scale)*1000;
             }
-            else if( i == 0 ){this.multiplier = 1;}                               //multipier resets when player character object hits gameplay "enemy" object
-            else if( i == 1 ){this.multiplier2 = 1;}                                                                                 
-            if(obj2.scale<10){objects.splice(j,1);}
-          }
-          else
-          {
-            if(i>0)
+            if(this.isTwoPlayerGame)                                                //handles player scoring based one game type
+            {                                                                       //TODO refactor into something less messy  
+              if(i>1)
+              {
+                if(!this.endGame())
+                {
+                  if(this.playerObjects[i].owner == this.player){this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;}
+                  else if(this.playerObjects[i].owner == this.player2){this.playerScore2 += Math.ceil(1000/obj2.scale) * this.multiplier2;}
+                }
+                if(this.playerObjects[i].owner == this.player){this.multiplier++;}
+                else if(this.playerObjects[i].owner == this.player2){this.multiplier2++;}                                                                                  
+                this.playerObjects.splice(i,1);
+                if(obj2.scale > 60)
+                {                                                                   //large gameplay objects split in two when hit
+                  var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
+                  obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
+                  objects.push(spawn);
+                }
+              }
+              else if( i == 0 ){this.multiplier = 1;}                               //multipier resets when player character object hits gameplay "enemy" object
+              else if( i == 1 ){this.multiplier2 = 1;}                                                                                 
+              if(obj2.scale<10){objects.splice(j,1);}
+            }
+            else
             {
-              if(!this.endGame())
+              if(i>0)
               {
-                this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;
-                this.multiplier++;
-              }                                                                                 
-              this.playerObjects.splice(i,1);
-              if(obj2.scale > 60)
-              {
-                var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
-                var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
-                obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
-                objects.push(spawn);
+                if(!this.endGame())
+                {
+                  this.playerScore += Math.ceil(1000/obj2.scale) * this.multiplier;
+                  this.multiplier++;
+                }                                                                                 
+                this.playerObjects.splice(i,1);
+                if(obj2.scale > 60)
+                {
+                  var randomizeXPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeYPos = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeXVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var randomizeYVel = ((Math.random() * obj2.scale * Math.sqrt(2)) - obj2.scale/Math.sqrt(2)) * this.randomizer;
+                  var spawn = new Game.Entity((obj2.xPos)+randomizeXPos, (obj2.yPos)+randomizeYPos, obj2.zPos, (obj2.xVel)+randomizeXVel, (obj2.yVel)+randomizeYVel, obj2.zVel, Math.ceil((obj2.scale)/Math.sqrt(2)), obj2.density);
+                  obj2.scale = Math.ceil(obj2.scale/Math.sqrt(2));
+                  objects.push(spawn);
+                }
               }
+              if( i == 0 ){this.multiplier = 1;}                                                                               
+              if(obj2.scale<10){objects.splice(j,1);}
             }
-            if( i == 0 ){this.multiplier = 1;}                                                                               
-            if(obj2.scale<10){objects.splice(j,1);}
           }
         }
       }
@@ -435,7 +446,6 @@ collisionReaction(objs,i,j)                                                     
       var obj1 = objs[i];
       var obj2 = objs[j];
       var deltaX = obj2.xPos-obj1.xPos;
-      if(deltaX <= obj1.scale + obj2.scale)
       var deltaY = obj2.yPos-obj1.yPos;
       var sqDistance= Math.pow(deltaX,2) + Math.pow(deltaY,2);
       var overlap = sqDistance/(Math.pow(obj1.scale + obj2.scale,2));
@@ -775,7 +785,7 @@ io.sockets.on('connection', function(socket){                                   
   connections++;
 
   socket.on('signIn', function(data){                                             //sign in and sign up signal and data handling
-
+/*
     fs.readFile('./login.json', (err, data2) => {                                 //reads login info json file and compares it to data
       if(err)
       {                                                                           //TODO move from JSON file to cloud based database for better security
@@ -795,9 +805,50 @@ io.sockets.on('connection', function(socket){                                   
       else{socket.emit('signInResponse', {success:false});}
       USERS = {};                                                                 //clears temp user data, keeping JSON file data encapsulated
     });
+*/
+    var db = mysql.createConnection({
+      host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+      user: 'bg0yy4x6n4o0ca3k',
+      password: 'afjde8du6i1r9u1q',
+      database: 'q0fk5j60d5wgytqf'
+    })
+    db.connect((err) => {
+      if(err)
+      {
+        console.log("error connecting to database for sign in");
+      }
+      else
+      {
+        console.log("sign in function connected to database. id: " + socket.id);
+      }
+    });
+    db.query("SELECT * FROM Login WHERE Username = '" + data.username + "'", (err,result) => {
+      if(err)
+      {
+        console.log("error reading from database" + err);
+      }
+      else
+      {
+        if(result[0])
+        {
+          if(result[0].Password == data.password)
+          { 
+            socket.emit('signInResponse', {success:true});
+          }
+        }
+        else
+        {
+          socket.emit('signInResponse', {success:false});
+        }
+        db.end();
+        console.log("db closed after check");
+      }
+    });
+    console.log("sign in function connection for " + socket.id + " closed.");
   });
 
   socket.on('signUp', function(data){
+    /*
     fs.readFile('./login.json', (err, data2) => {                                 //reads JSON file and checks against data from client
       if(err)
       {
@@ -822,9 +873,63 @@ io.sockets.on('connection', function(socket){                                   
         {
           if(err){console.log("error writing file");}
           else{console.log('data written to login file. id: ' + socket.id);}
-          socket.emit('singUpResponse', {success:true});
+          socket.emit('signUpResponse', {success:true});
           USERS = {};
         });
+      }
+      */
+    var check = false; 
+    var db = mysql.createConnection({
+      host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+      user: 'bg0yy4x6n4o0ca3k',
+      password: 'afjde8du6i1r9u1q',
+      database: 'q0fk5j60d5wgytqf'
+    })
+    db.connect((err) => {
+      if(err)
+      {
+        console.log("error connecting to database for sign up");
+      }  
+      else
+      {
+        console.log("sign up check function connected to database. id: " + socket.id);
+      }
+    });
+    db.query("SELECT * FROM Login WHERE Username = '" + data.username + "'", (err,result) => {
+      if(err)
+      {
+        console.log("error reading from database during sign up check" + err);
+        socket.emit('signUpResponse', {success:false});
+      }
+      else
+      {
+        console.log("no query error on db check");
+        if(result[0])
+        {
+          console.log("check for result0 successful");
+          if(result[0].Username == data.username)
+          {
+            console.log("username already exists in db");
+            socket.emit('signUpResponse', {success:false});
+            db.end();
+          }
+        }
+        else
+        {
+          db.query("INSERT INTO Login VALUES('" + data.username + "','" + data.password + "')", (err) => {
+            if(err)
+            {
+              console.log("error inserting sign up data for " + socket.id);
+              console.log(err);
+            }
+            else
+            {
+              socket.emit('signUpResponse', {success:true});
+            }
+            console.log("db closed after insert attempt");
+            db.end();
+          });
+        }
       }
     });
   });
@@ -1070,65 +1175,65 @@ io.sockets.on('connection', function(socket){                                   
       var socket = SOCKET_LIST[i];                                            //loops through all connected sockets and checks if any of them have any associated Game object
       if(socket.hostingSession)
       {
-        var session = SESSION_LIST[socket.id];
-        var game = session.game
-        if(game)
+        if(SESSION_LIST[socket.id].game)
         {
-          if(!game.gameOver)                                                    //if a game exists and it isnt over, game loop for this frame of this game commences
+          if(!SESSION_LIST[socket.id].game.gameOver)                                                    //if a game exists and it isnt over, game loop for this frame of this game commences
           {
-            if(!game.paused)
+            if(!SESSION_LIST[socket.id].game.paused)
             {
-              game.tick++;
+              SESSION_LIST[socket.id].game.tick++;
 
-            if(game.tick >= 6000)                                               //tick to keep displayed game clock even with loop
-            {                                                                   //TODO get rid of magic number
-              game.zDifficultyMultiplier += 0.1;                                //temp difficult adjustment stuff
-              if(game.spawnRate > 1)
+              if(SESSION_LIST[socket.id].game.tick >= 6000)                                               //tick to keep displayed game clock even with loop
+              {                                                                   //TODO get rid of magic number
+               SESSION_LIST[socket.id].game.zDifficultyMultiplier += 0.1;                                //temp difficult adjustment stuff
+                if(SESSION_LIST[socket.id].game.spawnRate > 1)
               {
-                game.spawnRate--;
-                game.zDifficultyMultiplier += 0.1;
-                game.tick = 0;
-                game.spawnClock = 0;
+                SESSION_LIST[socket.id].game.spawnRate--;
+                SESSION_LIST[socket.id].game.zDifficultyMultiplier += 0.1;
+                SESSION_LIST[socket.id].game.tick = 0;
+                SESSION_LIST[socket.id].game.spawnClock = 0;
+              }
+            
+
+              SESSION_LIST[socket.id].game.randomizer = Math.random() - 0.5;                             //creates a random number between -0.5 and 0.5 to randomize various processes
+                                                                             //TODO refactor into function. maybe move into cleanup loop    
+              SESSION_LIST[socket.id].game.cleanUpLoop();                                                //removes non-player objects from their arrays for gabage collection when off screen 
+  
+              SESSION_LIST[socket.id].game.spawnClock++
+                                                                             //temporary spawner delay to increase difficulty
+              if(SESSION_LIST[socket.id].game.spawnClock==SESSION_LIST[socket.id].game.spawnRate)                               
+              {
+                SESSION_LIST[socket.id].game.spawnerLoop();                                              //loop that creates various game objects that are not the player nor a player missile
+                SESSION_LIST[socket.id].game.spawnClock = 0;                                            
+              }
+              SESSION_LIST[socket.id].game.handleInput(SESSION_LIST[socket.id].game.pressedKeys1,SESSION_LIST[socket.id].game.player);                   //adjusts player information based on input data receive from client
+              if(SESSION_LIST[socket.id].game.isTwoPlayerGame){SESSION_LIST[socket.id].game.handleInput(SESSION_LIST[socket.id].game.pressedKeys2,SESSION_LIST[socket.id].game.player2);}
+
+              SESSION_LIST[socket.id].game.updateLoop(SESSION_LIST[socket.id].game.intervalTime/1000, SESSION_LIST[socket.id].game.zDifficultyMultiplier);//update of all game objects
+                                                                             //TODO refactor collision process        
+              SESSION_LIST[socket.id].game.collisionLoop();                                              //collision calculations among all collidable game objects that arent player or player weapons
+  
+              SESSION_LIST[socket.id].game.moveInZLoop();                                                //moves objects between layers based on their z value
+  
+              SESSION_LIST[socket.id].game.viewUpdate();                                                 //updates varaibles having to do with UI on the client
+                                                                             //TODO rename
+              socket.emit('playerLayer', SESSION_LIST[socket.id].game.playerObjects);                    //send data packages to the client(s)
+              socket.emit('objectLayers', SESSION_LIST[socket.id].game.layerObjects);                    //TODO refactor this into a loop when going beyond 2 player session
+              socket.emit('viewLayer', SESSION_LIST[socket.id].game.viewPackage);
+              if(SESSION_LIST[socket.id].game.isTwoPlayerGame)
+              {
+                SESSION_LIST[socket.id].socket2.emit('playerLayer', SESSION_LIST[socket.id].game.playerObjects);
+                SESSION_LIST[socket.id].socket2.emit('objectLayers', SESSION_LIST[socket.id].game.layerObjects);
+                SESSION_LIST[socket.id].socket2.emit('viewLayer', SESSION_LIST[socket.id].game.viewPackage2);
               }
             }
-
-            game.randomizer = Math.random() - 0.5;                             //creates a random number between -0.5 and 0.5 to randomize various processes
-                                                                             //TODO refactor into function. maybe move into cleanup loop    
-            game.cleanUpLoop();                                                //removes non-player objects from their arrays for gabage collection when off screen 
-  
-            game.spawnClock++
-                                                                             //temporary spawner delay to increase difficulty
-            if(game.spawnClock==game.spawnRate)                               
-            {
-              game.spawnerLoop();                                              //loop that creates various game objects that are not the player nor a player missile
-              game.spawnClock = 0;                                            
-            }
-            game.handleInput(game.pressedKeys1,game.player);                   //adjusts player information based on input data receive from client
-            if(game.isTwoPlayerGame){game.handleInput(game.pressedKeys2,game.player2);}
-
-            game.updateLoop(game.intervalTime/1000, game.zDifficultyMultiplier);//update of all game objects
-                                                                             //TODO refactor collision process        
-            game.collisionLoop();                                              //collision calculations among all collidable game objects that arent player or player weapons
-  
-            game.moveInZLoop();                                                //moves objects between layers based on their z value
-  
-            game.viewUpdate();                                                 //updates varaibles having to do with UI on the client
-                                                                             //TODO rename
-            socket.emit('playerLayer', game.playerObjects);                    //send data packages to the client(s)
-            socket.emit('objectLayers', game.layerObjects);                    //TODO refactor this into a loop when going beyond 2 player session
-            socket.emit('viewLayer', game.viewPackage);
-            if(game.isTwoPlayerGame)
-            {
-              session.socket2.emit('playerLayer', game.playerObjects);
-              session.socket2.emit('objectLayers', game.layerObjects);
-              session.socket2.emit('viewLayer', game.viewPackage2);
-            }
           }
+          
         }
         else if(!socket.gameOverSent)                                        //when game is over on server, send signal to client(s)
         {
           socket.emit('gameOver');                                           //TODO refactor into loop for more than 2 players
-          if(game.isTwoPlayerGame){session.socket2.emit('gameOver');}
+          if(SESSION_LIST[socket.id].game.isTwoPlayerGame){SESSION_LIST[socket.id].socket2.emit('gameOver');}
           socket.gameOverSent = true;
         }
       }                                                           
