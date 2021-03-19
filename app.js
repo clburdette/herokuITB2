@@ -552,6 +552,7 @@ endGame()                                                                     //
     this.viewPackage2.patientHealth = this.patientHealth;
     this.viewPackage2.tick = this.tick;
   }
+
   
   viewUpdate()                                                                //caps multipliers
   {                                                                           //TODO rename. Has to be a better place for this
@@ -564,7 +565,7 @@ endGame()                                                                     //
     {
       this.multiplier = 1;
       this.multiplier2 = 1;
-      this.gameOver = true;                                                   //this is redundant
+      this.gameOver = true;                                                  //this is redundant
     }
     this.updateViewPackage();  
   }
@@ -833,6 +834,8 @@ io.sockets.on('connection', function(socket){                                   
         {
           if(result[0].Password == data.password)
           { 
+            socket.playerID = data.username;
+            USER_LIST[socket.id] = socket.playerID;
             socket.emit('signInResponse', {success:true});
           }
         }
@@ -878,7 +881,6 @@ io.sockets.on('connection', function(socket){                                   
         });
       }
       */
-    var check = false; 
     var db = mysql.createConnection({
       host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
       user: 'bg0yy4x6n4o0ca3k',
@@ -900,6 +902,7 @@ io.sockets.on('connection', function(socket){                                   
       {
         console.log("error reading from database during sign up check" + err);
         socket.emit('signUpResponse', {success:false});
+        db.end();
       }
       else
       {
@@ -911,8 +914,8 @@ io.sockets.on('connection', function(socket){                                   
           {
             console.log("username already exists in db");
             socket.emit('signUpResponse', {success:false});
-            db.end();
           }
+          db.end();
         }
         else
         {
@@ -934,6 +937,94 @@ io.sockets.on('connection', function(socket){                                   
     });
   });
 
+  function postScores(session)
+  {
+    var db = mysql.createConnection({
+      host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+      user: 'bg0yy4x6n4o0ca3k',
+      password: 'afjde8du6i1r9u1q',
+      database: 'q0fk5j60d5wgytqf'
+    })
+    db.connect((err) => {
+      if(err)
+      {
+        console.log("error connecting to database for sign up");
+      }  
+      else
+      {
+        console.log("sign up check function connected to database. id: " + socket.id);
+      }
+    });
+    db.query("SELECT * FROM HighScore WHERE Username = '" + session.socket1.playerID + "'", (err,result) => {
+      if(err)
+      {
+        console.log("error reading from database during high score check" + err);
+        db.end();
+      }
+      else
+      {
+        console.log("no query error on high score check");
+        if(result[0])
+        {
+          console.log("check for high score result0 successful");
+          if(result[0].Score < session.game.playerScore)
+          {
+            db.query("UPDATE HighScore SET Score = " + session.game.playerScore + " WHERE Username = '" + session.socket1.playerID + "'");
+          }
+          db.end();
+        }
+        else
+        {
+          db.query("INSERT INTO HighScore VALUES(" + session.socket1.playerID + "," + session.game.playerScore + ")", (err) => {
+            if(err)
+            {
+              console.log("error inserting high score data for " + socket.id);
+              console.log(err);
+            }
+            console.log("db closed after insert attempt");
+            db.end();
+          });
+        }
+      }
+    });
+  
+    if(session.game.isTwoPlayerGame)
+    {
+      db.query("SELECT * FROM HighScore WHERE Username = '" + session.socket2.playerID + "'", (err,result) => {
+        if(err)
+        {
+          console.log("error reading from database during high score check" + err);
+          db.end();
+        }
+        else
+        {
+          console.log("no query error on high score check");
+          if(result[0])
+          {
+            console.log("check for high score result0 successful");
+            if(result[0].Score < session.game.PlayerScore2)
+            {
+              db.query("UPDATE HighScore SET Score = " + session.game.playerScore2 + " WHERE Username = '" + session.socket2.playerID + "'");
+            }
+            db.end();
+          }
+          else
+          {
+            db.query("INSERT INTO HighScore VALUES(" + session.socket1.playerID + "," + session.game.playerScore + ")", (err) => {
+              if(err)
+              {
+                console.log("error inserting high score up data for " + socket.id);
+                console.log(err);
+              }
+              console.log("db closed after insert attempt");
+              db.end();
+            });
+          }
+        }
+      });
+    }
+  }
+  
   function gameStartup()                                                          //creates new single player game
   {
     var singlePlayerSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
@@ -1232,8 +1323,12 @@ io.sockets.on('connection', function(socket){                                   
         }
         else if(!socket.gameOverSent)                                        //when game is over on server, send signal to client(s)
         {
+          postScores(SESSION_LIST[socket.id]);
+          if(SESSION_LIST[socket.id].game.isTwoPlayerGame)
+          {
+            SESSION_LIST[socket.id].socket2.emit('gameOver');
+          }
           socket.emit('gameOver');                                           //TODO refactor into loop for more than 2 players
-          if(SESSION_LIST[socket.id].game.isTwoPlayerGame){SESSION_LIST[socket.id].socket2.emit('gameOver');}
           socket.gameOverSent = true;
         }
       }                                                           

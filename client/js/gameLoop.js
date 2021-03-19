@@ -8,13 +8,14 @@ function gameLoop(){
     playArea.weaponsContext.clearRect(0,0,playArea.weaponsCanvas.width,playArea.weaponsCanvas.height);  //clear "special" canvas to ready for update during current frame
     playArea.playerContext.clearRect(0,0,playArea.playerCanvas.width,playArea.playerCanvas.height);
     playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
-    if(!playerLayerReceived)                                                                      //checks for reception of package from server.  If missed, the client recalculates positions of
+    if(!playerLayerReceived && player != null)                                                                      //checks for reception of package from server.  If missed, the client recalculates positions of
     {                                                                                             //various objects based on the previous frame's information.  Meant to fill in very short gaps
+      console.log(player);
       var i = 1;                                                                                  //caused by occasional latency to and from server.
       if(!server2init && serverAccept2){handleInput(player2);}                                    
       else{handleInput(player);}
       updatePlayer(player);
-      if(serverAccept2)
+      if(serverAccept2 && player2 != null)
       {
         updatePlayer(player2);
         i = 2;
