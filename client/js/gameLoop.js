@@ -10,7 +10,6 @@ function gameLoop(){
     playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
     if(!playerLayerReceived && player != null)                                                                      //checks for reception of package from server.  If missed, the client recalculates positions of
     {                                                                                             //various objects based on the previous frame's information.  Meant to fill in very short gaps
-      console.log(player);
       var i = 1;                                                                                  //caused by occasional latency to and from server.
       if(!server2init && serverAccept2){handleInput(player2);}                                    
       else{handleInput(player);}
@@ -25,7 +24,6 @@ function gameLoop(){
         playerObjects[i].xPos += playerObjects[i].xVel*intervalTime/1000;        
         playerObjects[i].yPos += playerObjects[i].yVel*intervalTime/1000;
       }
-      console.log("client side player update");
     }
     playerLayerReceived = false;
     if(!objectLayerReceived)

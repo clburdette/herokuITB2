@@ -6,7 +6,6 @@
     <link rel="stylesheet" type="text/css" href="/client/css/mainPageStyle.css"></link>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
     <script type="text/javascript" src="/client/js/controller.js"></script>
-    <script type="text/javascript" src="/client/js/framework.js"></script>
     <script type="text/javascript" src="/client/js/gameLoop.js"></script>
     <script type="text/javascript" src="/client/js/model.js"></script>
     <script type="text/javascript" src="/client/js/playArea.js"></script>
@@ -43,23 +42,26 @@
   socket.on("twoPlayerSessionStarted", function(){                                                      //acknowledges that a 2-player session has started on the server and puts
     server2init = true;
     document.getElementById("tempStart").removeEventListener('click', requestGameStart, false);
-    document.getElementById("tempStart2").removeEventListener('click', requestTwoPlayerGameStart, false);                                                                                 //client into a wait state until 2nd player is available
-    document.getElementById("parent").innerHTML = "game session started. waiting for 2nd player";
+    document.getElementById("tempStart2").removeEventListener('click', requestTwoPlayerGameStart, false);
+    document.getElementById("Message").style.display = "block";                                                                                 //client into a wait state until 2nd player is available
+    document.getElementById("Message").innerHTML = "game session started. waiting for 2nd player";
   });
 
   socket.on("twoPlayerGameStarted", function(){                                                         //acknowledges that a 2-player game is running in the previous started 2-player
     serverAccept2 = true;
-    console.log("2 player game start received");                                                                               //session.  Beings game loop on client.
+    console.log("2 player game start received");
+    document.getElementById("Message").innerHTML = "";
+    document.getElementById("Message").style.display = "none";                                                                               //session.  Beings game loop on client.
     initGame();
   });
 
   socket.on("serverFull", function(){                                                                   //Server capacity is preliminarily set at 10 sockets.  This signal lets the client know
-    document.getElementById("parent").innerHTML = "server full. please wait for game to start";         //that the server is at capacity and puts the client in a wait state.  Wait state will
+    document.getElementById("Message").innerHTML = "server full. please wait for game to start";         //that the server is at capacity and puts the client in a wait state.  Wait state will
     requestGameStart();                                                                                 //continually ping the server to check for openings until there is one.
   });
 
   socket.on("serverFull2", function(){
-    document.getElementById("parent").innerHTML = "server full. please wait for game to start";         //Similar to serverFull above, but for 2-player sessions     
+    document.getElementById("Message").innerHTML = "server full. please wait for game to start";         //Similar to serverFull above, but for 2-player sessions     
     requestTwoPlayerGameStart();
   });
 
@@ -106,48 +108,16 @@
     else{console.log("no view layer data in package");}
   });
 
-  socket.on('gameOver', function(){                                                                   //tells the client what to do when it has received a signal from the server that the current
-    clearInterval(myInterval);                                                                        //game session on the server has ended
-    console.log("game over socket:" + socket.id);
-    gamePaused = false;
-    serverAccept = false;
-    serverAccept2 = false;
-    server2init = false;
-    returnToMain();
+  socket.on('gameOver', function(data){                                                              //tells the client what to do when it has received a signal from the server that the current
+    clearGame();
+    console.log("data in socket gameOver");
+    console.log(data);
+    displayHighScores(data);
   });
+
       function init()                                                                   //game intro screen
       {
-        var introTxt = "";                                           
-        introTxt += "<div style='text-align: center; width: 100%'>";
-        introTxt += "<br><br><u>STORY</u><br><br>";
-        introTxt += "Your patient is infected with a deadly blood disease!<br>";
-        introTxt += "The only way to stop the spread of infection is inserting<br>";
-        introTxt += "a remotely controlled micro-device that you control in<br>";
-        introTxt += " to clean the infected cells from the blood directly<br><br>";
-        introTxt += "<u>RULES</u><br><br>";
-        introTxt += "1) infections bubble up toward the camera. Black blood cells<br>";
-        introTxt += "are about to become infected.  Purple blood cells are infected!<br>";
-        introTxt += "Shoot purple cells with your anti-body weapons. Watch out for<br>";
-        introTxt += "black cells that may turn into purple cells.<br><br>";
-        introTxt += "2) If infected cells float past the bottom of your view, they<br>";
-        introTxt += "spread to the rest of the bloodstream and hurt the health of<br>";
-        introTxt += "your patient.  The bigger the infection, the bigger the hurt.<br>";
-        introTxt += "If your patient's health reaches zero, they die!<br><br>";
-        introTxt += "3) Your micro-device is coated in anti-bodies.  You can ram<br>";
-        introTxt += "infected cells with your micro-device to destroy them.  However,<br>";
-        introTxt += "each collision weakens your micro-device's hull integrity.  If it<br>";
-        introTxt += "reaches zero, your micro-device is destroyed and your patient dies!<br><br>";
-        introTxt += "<u>CONTROLS</u><br><br>";
-        introTxt += "W - Move Forward<br>";
-        introTxt += "S - Move Back<br>";
-        introTxt += "A - Rotate Left<br>";
-        introTxt += "D - Rotate Right<br>";
-        introTxt += "Left Click - fire<br>";
-        introTxt += "keep your mouse in the play area!<br><br>";
-        introTxt += "</div><br>";
-        introTxt += "<div><div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here for 1 player</div>";
-        introTxt += "<div id='tempStart2' style='text-align: center; width: 15%; background-color: orange; margin: auto;'>click here for 2 player</div></div>";
-        document.getElementById("parent").innerHTML = introTxt;                                             //display intro text in div found in index  
+        document.getElementById("parent").style.display = "block";                                             //display intro text in div found in index  
         document.getElementById("tempStart").addEventListener('click', requestGameStart, false);
         document.getElementById("tempStart2").addEventListener('click', requestTwoPlayerGameStart, false);
         console.log("init page loaded");
@@ -157,11 +127,14 @@
       function initGame()                                                                                   //creates conditions necessary for building the game
       { 
         console.log("initGame function accessed");
+        document.getElementById("Message").style.display = "none";  
         if(!server2init)
         {
           document.getElementById("tempStart").removeEventListener('click', requestGameStart, false);
           document.getElementById("tempStart2").removeEventListener('click', requestTwoPlayerGameStart, false);                                                          
         }
+        document.getElementById("parent").style.display = "none";
+        document.getElementById("gameDiv").style.display = "block";
         playArea.makeCanvasTags(numCanvases);                                                               //creates canvas and canvas contexts and places the into array where they can be accessed  
         playArea.makeCanvases(numCanvases);                                                                 
         playArea.makeContexts(numCanvases);                                                                 
@@ -170,7 +143,7 @@
         playArea.makePlayer2Layer();
         playArea.makeWeaponsLayer();
         view.makeUILayer();                                                                                 //change listeners for mouse input from menu to gameplay
-        document.getElementById("parent").style.cursor = "none";                                            //no visible cursor
+        document.getElementById("gameDiv").style.cursor = "none";                                            //no visible cursor
         document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        
         document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);                 //continuous handling off input outside of the game loop
         document.addEventListener('keydown', keyDownHandler, false);                                 
@@ -189,7 +162,8 @@
         else
         {
           console.log("game start error");
-          document.getElementById("parent").innerHTML = "an error occurred. please reload this page.";
+          document.getElementById("Message").style.display = "block";  
+          document.getElementById("Message").innerHTML = "an error occurred. please reload this page.";
         }
       }
 
@@ -203,56 +177,169 @@
         else
         {
           console.log("game start error");
-          document.getElementById("parent").innerHTML = "an error occurred. please reload this page.";
+          document.getElementById("Message").style.display = "block";  
+          document.getElementById("Message").innerHTML = "an error occurred. please reload this page.";
         }
       }
 
-      function postGame()                                                                                 //puts the client into a state that enables restart once a game has ended or a 2-player game session
-      {                                                                                                   //has been abandoned
-        var postText = "";                                                                                //TODO clean this up into a REAL post-game state.
-        document.getElementById("parent").style.cursor = "auto";                                          //no visible cursor
+      function removeGameListeners()
+      {
         document.removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);
         document.removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);
         document.removeEventListener('keydown', keyDownHandler, false);                            
-        document.removeEventListener('keyup', keyUpHandler, false);
-        postText += "<div style='text-align: center; width: 100%'>You Lose!</div>";
-        postText += "<div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here to restart</div>"
-        postText += "<div style='text-align: center; width: 100%'>or close browser tab to quit.</div>";
-        document.getElementById("parent").innerHTML = postText;                                           //display intro text in div found in index  
-        document.getElementById("tempStart").addEventListener('click', restartGame, false);
+        document.removeEventListener('keyup', keyUpHandler, false);        
       }
 
       function restartGame()                                                                              //send client from end of game state back to the game intro screen. temp solution.
       {                                                                                                   //TODO handle this automatically without unnecessary extra button press
-          document.getElementById("tempStart").removeEventListener('click', restartGame, false);
-          if(server2init){socket.emit("sessionReset")}
-          else{socket.emit('endGame');}                                                                   //TODO end game and delete game on server side in the post game state
-          server2init = false;                                                                            //TODO This should start a new game, not end the old one like it does now.
-          init();
+        if(server2init){socket.emit("sessionReset")}
+        else{socket.emit('endGame');}                                                                   //TODO end game and delete game on server side in the post game state
+        document.getElementById("scoresButtonDiv").removeEventListener('click', restartGame, false);
+        console.log("restart listener removed"); 
+        document.getElementById("highScoresDiv").style.display = "none";
+        console.log("high scores div not visible");
+        server2init = false;                                                                          //TODO This should start a new game, not end the old one like it does now.
+        init();
       }  
       
-      function returnToMain()
-      {
-        document.getElementById("parent").style.cursor = "auto";                                          //no visible cursor
-        document.removeEventListener('mousedown', function(){pressedKeys["m"] = true;}, false);
-        document.removeEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);
-        document.removeEventListener('keydown', keyDownHandler, false);                            
-        document.removeEventListener('keyup', keyUpHandler, false);
+      function clearGame()
+      {                                         //no visible cursor
+        clearInterval(myInterval);
+        removeGameListeners();
+        document.getElementById("gameDiv").innerHTML = "";                                                                        //game session on the server has ended
+        gamePaused = false;
         serverAccept = false;
-        server2init = false;
-        document.getElementById("parent").innerHTML = "";
+        serverAccept2 = false;
         canvasBag.length = 0;                                            
         contextBag.length = 0;                                                              //TODO address sluggishness and framerate
         layerObjects.length = 0;                                                        
         player = null;
         player2 = null;
         playerObjects.length = 0;                                                                             //TODO This should start a new game, not end the old one like it does now.
-        init();
       }
+
+      function displayHighScores(data)
+      {
+        document.getElementById("highScoresDiv").style.display = "block";
+        console.log("high scores div visible");
+        document.getElementById("scoresButtonDiv").addEventListener('click', restartGame, false);
+        console.log("restart listener added");
+        console.log("data in displayHighScores");
+        var Names = Object.keys(data);
+        var Scores = Object.values(data);
+        for(var i = 0; i < 10; i++)
+        {
+          var first = "p" + (i+1).toString() + "name";
+          var second = "p" + (i+1).toString() + "score";
+          console.log(first);
+          console.log(second);
+          if(Names[i] != null || typeof Names[i] !="undefined")
+          {
+            document.getElementById(first).innerHTML = Names[i];
+            document.getElementById(second).innerHTML = Scores[i].toString();
+          }
+        }
+      }
+
     </script>
   </head>
   <body>
-    <div id="parent">
+    <div id="parent" style="display:none">
+      <div style='text-align: center; width: 100%'>
+        <br><br><u>STORY</u><br><br>
+        Your patient is infected with a deadly blood disease!<br>
+        The only way to stop the spread of infection is inserting<br>
+        a remotely controlled micro-device that you control in<br>
+        to clean the infected cells from the blood directly<br><br>
+        <u>RULES</u><br><br>
+        1) infections bubble up toward the camera. Black blood cells<br>
+        are about to become infected.  Purple blood cells are infected!<br>
+        Shoot purple cells with your anti-body weapons. Watch out for<br>
+        black cells that may turn into purple cells.<br><br>
+        2) If infected cells float past the bottom of your view, they<br>
+        spread to the rest of the bloodstream and hurt the health of<br>
+        your patient.  The bigger the infection, the bigger the hurt.<br>
+        If your patient's health reaches zero, they die!<br><br>
+        3) Your micro-device is coated in anti-bodies.  You can ram<br>
+        infected cells with your micro-device to destroy them.  However,<br>
+        each collision weakens your micro-device's hull integrity.  If it<br>
+        reaches zero, your micro-device is destroyed and your patient dies!<br><br>
+        <u>CONTROLS</u><br><br>
+        W - Move Forward<br>
+        S - Move Back<br>
+        A - Rotate Left<br>
+        D - Rotate Right<br>
+        Left Click - fire<br>
+      </div>
+      <br>
+      <div>
+        <div id='tempStart' style='text-align: center; width: 15%; background-color: red; margin: auto;'>click here for 1 player</div>
+        <br>
+        <div id='tempStart2' style='text-align: center; width: 15%; background-color: orange; margin: auto;'>click here for 2 player</div>
+      </div>
+    </div>
+    <div id="gameDiv">
+    </div>
+    <div id="highScoresDiv" style="display:none">
+      <table>
+        <tr>
+          <th>Rank</th>
+          <th>Player</th>
+          <th>Score</th>
+        </tr>
+        <tr>
+          <th>1</th>
+          <th id="p1name"></th>
+          <th id="p1score"></th>
+        </tr>
+        <tr>
+          <th>2</th>
+          <th id="p2name"></th>
+          <th id="p2score"></th>
+        </tr>
+        <tr>
+          <th>3</th>
+          <th id="p3name"></th>
+          <th id="p3score"></th>
+        </tr>
+        <tr>
+          <th>4</th>
+          <th id="p4name"></th>
+          <th id="p4score"></th>
+        </tr>
+        <tr>
+          <th>5</th>
+          <th id="p5name"></th>
+          <th id="p5score"></th>
+        </tr>
+        <tr>
+          <th>6</th>
+          <th id="p6name"></th>
+          <th id="p6score"></th>
+        </tr>
+        <tr>
+          <th>7</th>
+          <th id="p7name"></th>
+          <th id="p7score"></th>
+        </tr>
+        <tr>
+          <th>8</th>
+          <th id="p8name"></th>
+          <th id="p8score"></th>
+        </tr>
+        <tr>
+          <th>9</th>
+          <th id="p9name"></th>
+          <th id="p9score"></th>
+        </tr>
+        <tr>
+          <th>10</th>
+          <th id="p10name"></th>
+          <th id="p10score"></th>
+        </tr>
+      </table>
+      <br>
+      <div id='scoresButtonDiv' style='text-align: center; width: 15%; background-color: red; margin: auto;'>continue</div>
     </div>
     <div id="signDiv">
       Username: <input id="signDiv-username" type="text"></input><br>
@@ -267,7 +354,10 @@
       </form>
     </div>
     -->
-    <div id="errorMessage"></div>
+    <div id="Message"></div>
+    <div id="continueToMain" style="display:none;">
+      <button id="continueToMainButton" style="display:none;">Continue</button>      
+    </div>
     <div id = "pauseButtons" style="position:relative; margin-top:768px;">
 
       <button id="continueButton" style="display:none;">Continue</button>
@@ -283,6 +373,7 @@
       var signDivSignIn = document.getElementById("signDiv-signIn");
       var signDivSignUp = document.getElementById("signDiv-signUp");
       var signDivPassword = document.getElementById("signDiv-password");
+      var contToMain = document.getElementById("continueToMainButton");
 
       contButton.onclick = function(){
         view.removePauseScreen();
@@ -296,17 +387,24 @@
         view.removePauseScreen();
       }
 
+      contToMain.onclick = function(){
+        gamePaused = false;
+        document.addEventListener('mousedown', function(){pressedKeys["m"] = true; mouseDownCheck = true;}, false);        
+        document.addEventListener('mouseup', function(){pressedKeys["m"] = false;}, false);
+        socket.emit("continueGame");
+      }
+
       signDivSignIn.onclick = function(){                                                                //handles sign in data and sends it to the server if applicable 
         if(isValidFormInput(signDivUsername.value) && isValidFormInput(signDivPassword.value))
         {
-          document.getElementById("errorMessage").innerHTML = "";
+          document.getElementById("Message").innerHTML = "";
           socket.emit('signIn', {
           username : signDivUsername.value,
           password : signDivPassword.value});
         }
         else
         {
-          document.getElementById("errorMessage").innerHTML = "user name and/or password must be at least 4 characters in length";
+          document.getElementById("Message").innerHTML = "user name and/or password must be at least 4 characters in length";
         }
       };
 
@@ -324,23 +422,24 @@
       socket.on('signInResponse', function(data){                                                       //handles response from server concerning the sign in data
         if(data.success)
         {
-          signDiv.innerHTML = "";
+          signDiv.style.display = "none";          
+          document.getElementById("Message").style.display = "none";
           init();
         }
         else 
         {
-          document.getElementById("errorMessage").innerHTML = "user name and/or password are not valid";
+          document.getElementById("Message").innerHTML = "user name and/or password are not valid";
         }
       });
 
       socket.on('signUpResponse', function(data){                                                       //handles response from server concerning the sign in data
         if(data.success)                                                                                //currently a bug here where sign up success message does not display
         {
-          document.getElementById("errorMessage").innerHTML = "please sign in with your newly created user name and password";
+          document.getElementById("Message").innerHTML = "please sign in with your newly created user name and password";
         }
         else
         {
-          document.getElementById("errorMessage").innerHTML = "user name is not available. try another.";
+          document.getElementById("Message").innerHTML = "user name is not available. try another.";
         }
       });
       /*
