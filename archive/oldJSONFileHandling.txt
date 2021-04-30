@@ -1,0 +1,55 @@
+  socket.on('signIn', function(data){                                             //sign in and sign up signal and data handling
+
+    fs.readFile('./login.json', (err, data2) => {                                 //reads login info json file and compares it to data
+      if(err)
+      {                                                                           //TODO move from JSON file to cloud based database for better security
+        console.log("error reading file");
+      }
+      else
+      {
+        USERS = JSON.parse(data2);
+        console.log('data read from login file. id: ' + socket.id);
+      }
+      if(USERS[data.username] && USERS[data.username] === data.password)
+      {  
+        socket.playerID = data.username;
+        USER_LIST[socket.id] = socket.playerID;
+        socket.emit('signInResponse', {success:true});                            //send response to client
+      }
+      else{socket.emit('signInResponse', {success:false});}
+      USERS = {};                                                                 //clears temp user data, keeping JSON file data encapsulated
+    });
+
+
+  socket.on('signUp', function(data){
+
+    fs.readFile('./login.json', (err, data2) => {                                 //reads JSON file and checks against data from client
+      if(err)
+      {
+        console.log("error reading file");       
+      }
+      else
+      {
+        USERS = JSON.parse(data2);
+        console.log('data read from login file. id: ' + socket.id);
+      }
+
+      if(USERS[data.username])
+      {
+        socket.emit('signUpResponse', {success:false});
+        USERS = {};
+      }
+      else
+      {
+        USERS[data.username] = data.password;
+        var temp = JSON.stringify(USERS, null, 2);
+        fs.writeFile('./login.json', temp, function(err)                          //writes new user to JSON login file
+        {
+          if(err){console.log("error writing file");}
+          else{console.log('data written to login file. id: ' + socket.id);}
+          socket.emit('signUpResponse', {success:true});
+          USERS = {};
+        });
+      }
+
+

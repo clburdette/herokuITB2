@@ -135,7 +135,7 @@ drawPlayer : function(context, player)                                          
 displayPauseScreen : function()
 {
   document.getElementById("quitButton").style.display = "block";
-  if(serverAccept)
+  if(onePlayerGame)
   {
     document.getElementById("continueButton").style.display = "block";
   }

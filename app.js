@@ -50,9 +50,9 @@ class Game                                                                      
     this.intervalTime = 20;                                                         //synch to time game loop for determining distances in reference to a single frame
     this.playerScore = 0;                                                           //player1's actual score
     this.playerScore2 = 0;                                                          //player2's actual score
-    this.displayedScore = 0;                                                        //player1's displayed score
+    this.displayedScore = 0;                                                        //TODO move these to the client
     this.displayedScore2 = 0;                                                       //player2's displayed score
-    this.zDifficultyMultiplier = 1;                                                 //increases speed of movement for non-player object in the game's z-axis to increase difficutly over time
+    this.zDifficultyMultiplier = 1;                                                 //TODO get this and the temp difficulty increase in the game loop working properly again
     this.multiplier = 1;                                                            //player1 score multiplier
     this.multiplier2 = 1;                                                           //player2 score multiplier
     this.tick = 0;                                                                  //for keeping track of time
@@ -521,25 +521,21 @@ collisionLoop()                                                               //
 
 endGame()                                                                     //checks conditions for game being over
 {                                                                             
-  var gameOver = false;
-
-  if(this.player.health <= 0)                                                 //game over if player(s) hull is compromised
+  var over = false;
+  if(this.player.health <= 0 || this.patientHealth <= 0)                                                 //game over if player(s) hull is compromised
   {
     this.player.health = 0;
-    gameOver = true;
+    this.patientHealth = 0;
+    this.gameOver = true;
+    over = true;
   }
-  else if(this.isTwoPlayerGame && this.player2.health <= 0)
+  if(this.isTwoPlayerGame && this.player2.health <= 0)
   {
     this.player2.health = 0;
-    gameOver = true;
+    this.gameOver = true;
+    over = true;
   }
-  else if(this.patientHealth <= 0)                                            //game over if too many pathogens get past the player and infect the patient
-  {
-    this.patientHealth = 0;
-    gameOver = true;
-  }
-
-  return gameOver;
+  return over;
 }
 
   updateViewPackage()                                                         //updates variables to be sent to client in ui layer package(s)
@@ -566,7 +562,6 @@ endGame()                                                                     //
     {
       this.multiplier = 1;
       this.multiplier2 = 1;
-      this.gameOver = true;                                                  //this is redundant
     }
     this.updateViewPackage();  
   }
@@ -636,15 +631,7 @@ endGame()                                                                     //
       this.density=density;
       this.owner = owner;
     }
-  
-    draw()                                                                     //TODO remove this. happens on client
-    {
-      this.context.fillStyle = '#000000';                  
-      this.context.beginPath();
-      this.context.arc(this.xPos, this.yPos, this.scale, 0, 2*Math.PI);     
-      this.context.fill();
-    }
-  
+
     update(seconds)
     {
       this.xPos += this.xVel*seconds;        
@@ -672,34 +659,6 @@ endGame()                                                                     //
       this.isColliding=false;
       this.angle=0;                                                                //angle of the player's forward vector in relation to true north
       this.MAX_MAG=25;                                                             //maximum velocity of player object                                                            
-    }
-   
-    draw()                                                                        //TODO upgrade player appearance
-    {                                                                             //TODO remove this function. takes place on client.    
-      this.context.save();
-      this.context.translate(this.xPos, this.yPos);                               
-      this.context.fillStyle = '#FFAA00';                                          
-      this.context.beginPath();                                                   
-      this.context.arc(this.FirePointX/-2, this.FirePointY/-2, 14, 0, 2*Math.PI);
-      this.context.fill();
-      this.context.fillStyle = '#0000FF';                                         
-      this.context.beginPath();
-      this.context.arc(this.FirePointX, this.FirePointY, 4, 0, 2*Math.PI);
-      this.context.fill();
-      this.context.rotate(this.angle);                                            
-      this.context.fillStyle = '#00FF00';                                         
-      this.context.beginPath();                                                   
-      this.context.arc(0, 0, this.scale, 0, 2*Math.PI);                           
-      this.context.fill();                                                        
-      if(this.isColliding)                                                        
-      {
-        this.context.fillStyle = '#FF0000';                                       
-        this.context.beginPath();                                                 
-        this.context.arc(0, 0, this.scale, 0, 2*Math.PI);     
-        this.context.fill();
-        this.health--;
-      }
-      this.context.restore();          
     }
   
     changeVel(xValue, yValue)                                                     //TODO figure out what I was doing here
@@ -771,106 +730,8 @@ var activeTwoPlayerGames = 0;
 var twoPlayerOpenings = 0;
 var MAX_CONNECTIONS = 10;
 var DEBUG = false;
-/*
-function postScores(session)
-  {
-    console.log("in postScores function");
-    var db = mysql.createConnection({
-      host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
-      user: 'bg0yy4x6n4o0ca3k',
-      password: 'afjde8du6i1r9u1q',
-      database: 'q0fk5j60d5wgytqf'
-    })
-    db.connect((err) => {
-      if(err)
-      {
-        console.log("error connecting to database for high scores");
-      }  
-      else
-      {
-        console.log("post scores function connected to database. id: " + session.socket1.id);
-      }
-    });
-    db.query("SELECT * FROM HighScore WHERE Username = '" + session.socket1.playerID + "'", (err,result) => {
-      if(err)
-      {
-        console.log("error reading from database during high score check" + err);
-        session.scoresPosted = true;
-        db.end();
 
-      }
-      else
-      {
-        console.log("no query error on high score check");
-        if(result[0])
-        {
-          console.log("check for high score result0 successful");
-          if(result[0].Score < session.game.playerScore)
-          {
-            db.query("UPDATE HighScore SET Score = " + session.game.playerScore + " WHERE Username = '" + session.socket1.playerID + "'");
-          }
-          session.scoresPosted = true;
-          db.end();
-        }
-        else
-        {
-          console.log(session.game.playerScore);          
-          db.query("INSERT INTO HighScore VALUES('" + session.socket1.playerID + "'," + session.game.playerScore + ")", (err) => {
-            if(err)
-            {
-              console.log("error inserting high score data for " + session.socket1.id);
-              console.log(err);
-            }
-            console.log("db closed after insert attempt");
-            session.scoresPosted = true;
-            db.end();
-          });
-        }
-      }
-    });
-  
-    if(session.game.isTwoPlayerGame)
-    {
-      db.query("SELECT * FROM HighScore WHERE Username = '" + session.socket2.playerID + "'", (err,result) => {
-        if(err)
-        {
-          console.log("error reading from database during player 2 high score check" + err);
-          session.scoresPosted = true;
-          db.end();
-        }
-        else
-        {
-          console.log("no query error on player 2 high score check");
-          if(result[0])
-          {
-            console.log("check for player 2 high score result0 successful");
-            if(result[0].Score < session.game.playerScore2)
-            {
-              db.query("UPDATE HighScore SET Score = " + session.game.playerScore2 + " WHERE Username = '" + session.socket2.playerID + "'");
-            }
-            session.scoresPosted = true;
-            db.end();
-          }
-          else
-          {
-            console.log(session.game.playerScore2);
-            db.query("INSERT INTO HighScore VALUES('" + session.socket2.playerID + "'," + session.game.playerScore2 + ")", (err) => {
-              if(err)
-              {
-                console.log("error inserting high score up data for " + session.socket2.id);
-                console.log(err);
-              }
-              console.log("db closed after player 2 insert attempt");
-              session.scoresPosted = true;
-              db.end();
-            });
-          }
-        }
-      });
-    }
-  }
-*/
-  function getScores(session)
+  function getScores(session)                                                    //TODO figure a better name for this mess
   {
     var db = mysql.createConnection({
       host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
@@ -994,33 +855,13 @@ io.sockets.on('connection', function(socket){                                   
   socket.inTwoPlayerGame = false;
   socket.currentSession = null;
   socket.playerID = "";
-  var USERS;
+  var USERS;                                                                      //UNUSED left in for possible future expansion to more than 2 player sessions
   SOCKET_LIST[socket.id] = socket;
   console.log('socket connection');
   connections++;
 
   socket.on('signIn', function(data){                                             //sign in and sign up signal and data handling
-/*
-    fs.readFile('./login.json', (err, data2) => {                                 //reads login info json file and compares it to data
-      if(err)
-      {                                                                           //TODO move from JSON file to cloud based database for better security
-        console.log("error reading file");
-      }
-      else
-      {
-        USERS = JSON.parse(data2);
-        console.log('data read from login file. id: ' + socket.id);
-      }
-      if(USERS[data.username] && USERS[data.username] === data.password)
-      {  
-        socket.playerID = data.username;
-        USER_LIST[socket.id] = socket.playerID;
-        socket.emit('signInResponse', {success:true});                            //send response to client
-      }
-      else{socket.emit('signInResponse', {success:false});}
-      USERS = {};                                                                 //clears temp user data, keeping JSON file data encapsulated
-    });
-*/
+
     var db = mysql.createConnection({
       host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
       user: 'bg0yy4x6n4o0ca3k',
@@ -1065,36 +906,7 @@ io.sockets.on('connection', function(socket){                                   
   });
 
   socket.on('signUp', function(data){
-    /*
-    fs.readFile('./login.json', (err, data2) => {                                 //reads JSON file and checks against data from client
-      if(err)
-      {
-        console.log("error reading file");       
-      }
-      else
-      {
-        USERS = JSON.parse(data2);
-        console.log('data read from login file. id: ' + socket.id);
-      }
 
-      if(USERS[data.username])
-      {
-        socket.emit('signUpResponse', {success:false});
-        USERS = {};
-      }
-      else
-      {
-        USERS[data.username] = data.password;
-        var temp = JSON.stringify(USERS, null, 2);
-        fs.writeFile('./login.json', temp, function(err)                          //writes new user to JSON login file
-        {
-          if(err){console.log("error writing file");}
-          else{console.log('data written to login file. id: ' + socket.id);}
-          socket.emit('signUpResponse', {success:true});
-          USERS = {};
-        });
-      }
-      */
     var db = mysql.createConnection({
       host: 'phtfaw4p6a970uc0.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
       user: 'bg0yy4x6n4o0ca3k',
@@ -1154,7 +966,7 @@ io.sockets.on('connection', function(socket){                                   
   function gameStartup()                                                          //creates new single player game
   {
     var singlePlayerSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
-    singlePlayerSession.game = new Game(512, 384, false);
+    singlePlayerSession.game = new Game(512, 384, false);                         //TODO add session player signifier for future chat feature
     socket.currentSession = singlePlayerSession;
     socket.hostingSession = true;
     SESSION_LIST[socket.id] = singlePlayerSession;
@@ -1174,7 +986,7 @@ io.sockets.on('connection', function(socket){                                   
   {
     var hostedSession = new GameSession(USER_LIST[socket.id], SOCKET_LIST[socket.id]);
     SESSION_LIST[socket.id] = hostedSession;
-    console.log("game session created");
+    console.log("game session created");                                          //TODO add session player signifier for future chat feature
     socket.currentSession = hostedSession;
     socket.hostingSession = true;
     socket.emit("twoPlayerSessionStarted");
@@ -1231,37 +1043,19 @@ io.sockets.on('connection', function(socket){                                   
     console.log(activeGames + " games active");
   });
 
-  socket.on('disconnect', function(){                                             //things that occur when a player closes their browser window  
+  socket.on('disconnect', function(){ 
+    console.log("disconnection");                                            //things that occur when a player closes their browser window  
     if(!SESSION_LIST[socket.id])
     {
       if(socket.currentSession)                                                   //nullifies 2nd player portion of a session and notifies session host
       { 
-        /*                                                                          //when player number2(guest) leaves early
-        socket.currentSession.game.isTwoPlayerGame = false;
-        socket.currentSession.game.gameOver = true;
-        socket.currentSession.player2 = null;
-        socket.currentSession.socket2 = null;
-        */
         socket.currentSession.game.paused = true;
         socket.currentSession.socket1.emit("sessionAbandoned");
-        //console.log("player 2 dropped out");
-        //activeTwoPlayerGames--;
       }        
     }
     else
     {
-      if(SESSION_LIST[socket.id].hasTwoPlayers)                                    //ends game and session when session host drops out and notifies guest player                                 
-      {
-        socket.currentSession.game.paused = true;
-        SESSION_LIST[socket.id].socket2.emit("sessionAbandoned");
-        /*
-        delete GAME_LIST[socket.id];
-        delete SESSION_LIST[socket.id];
-        activeTwoPlayerGames--;
-        console.log("2 player game deleted");
-        */
-      }
-      else                                                                        //ends single player game and removes it from game list  
+      if(!SESSION_LIST[socket.id].hasTwoPlayers)                                    //ends game and session when session host drops out and notifies guest player                                 
       {
         delete GAME_LIST[socket.id];
         delete SESSION_LIST[socket.id];
@@ -1269,15 +1063,16 @@ io.sockets.on('connection', function(socket){                                   
         activeSinglePlayerGames--;
         console.log("1 player game deleted");
       }
-      //activeGames--;
-      //activeSessions--;
+      else                                                                        //ends single player game and removes it from game list  
+      {
+        socket.currentSession.game.paused = true;
+        SESSION_LIST[socket.id].socket2.emit("sessionAbandoned");;
+      }
     }
-    socket.gameOverSent = true;                                                   //logs and completes disconnection
-    connections--;
-    console.log("disconnection");
-    console.log(connections + " connections active");
     delete USER_LIST[socket.id];
     delete SOCKET_LIST[socket.id];
+    connections--;
+    console.log(connections + " connections active");
   });
 
   socket.on('playerInput', function(data){                                        //input from client processed and set to approriate Game object for use in the game loop
@@ -1319,7 +1114,7 @@ io.sockets.on('connection', function(socket){                                   
       else                                                                       //if a session is waiting, creates games and places game and 2nd player into the GameSession 
       {
         var tempSession;
-        for(var i in SESSION_LIST)
+        for(var i in SESSION_LIST)                                               
         {
           if(SESSION_LIST[i] && !SESSION_LIST[i].hasTwoPlayers)
           {
@@ -1443,14 +1238,8 @@ io.sockets.on('connection', function(socket){                                   
           {
             console.log("not gameoversent condition in socket reached");
             getScores(SESSION_LIST[socket.id]);
-           /* console.log("returned result from getScores: " + scores);
-            if(SESSION_LIST[socket.id].game.isTwoPlayerGame)
-            {
-              SESSION_LIST[socket.id].socket2.emit('gameOver', scores);
-            }
-            socket.emit('gameOver', scores); */                                          //TODO refactor into loop for more than 2 players
             socket.gameOverSent = true;
-          }         
+          }                                                                                           //TODO refactor into loop for more than 2 players
         }                                                                
       }
     }

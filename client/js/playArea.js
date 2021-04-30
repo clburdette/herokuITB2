@@ -15,7 +15,6 @@ makeCanvasTags : function(amount)                          //create string conta
   temp += '<canvas id="player" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+3).toString() +';"></canvas>"';
   temp += '<canvas id="player2" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+4).toString() +';"></canvas>"';
   temp += '<canvas id="UI" width="1024" height="768" style="background-color:transparent; position:absolute; left:0px; top:0px; z-index:' + (amount+5).toString() +';"></canvas>"';
-  console.log(temp);
 
   document.getElementById("gameDiv").innerHTML = temp;      //last 4 canvases are for player emitted projectiles, player1 character object, player2 character object, and user interface respectively
 }                                                          //TODO rename weapons canvas to projectiles for sake of continuity

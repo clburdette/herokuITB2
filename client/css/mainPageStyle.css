@@ -2,8 +2,28 @@
 position:relative;
 }
 
-#errorMessage{
-color:red;
+#Message{
+color:#FF0000;
 }
+
+table {
+border-collapse:collapse;
+margin: 0 auto;
+}
+
+th {
+background-color:#000000;
+color:#FFFFFF
+}
+
+tbody tr:nth-child(odd) {
+background:#EEE
+}
+
+td {
+border:1px solid #999;
+padding:10px 50px 0px 10px;
+text-align: left;
+} 
 
  

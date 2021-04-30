@@ -10,11 +10,13 @@ function gameLoop(){
     playArea.player2Context.clearRect(0,0,playArea.player2Canvas.width,playArea.player2Canvas.height);
     if(!playerLayerReceived && player != null)                                                                      //checks for reception of package from server.  If missed, the client recalculates positions of
     {                                                                                             //various objects based on the previous frame's information.  Meant to fill in very short gaps
+      missedPlayerPackets++;
+      console.log(missedPlayerPackets + " player packets missed");
       var i = 1;                                                                                  //caused by occasional latency to and from server.
-      if(!server2init && serverAccept2){handleInput(player2);}                                    
+      if(!twoPlayerInit && twoPlayerGame){handleInput(player2);}                                    
       else{handleInput(player);}
       updatePlayer(player);
-      if(serverAccept2 && player2 != null)
+      if(twoPlayerGame && player2 != null)
       {
         updatePlayer(player2);
         i = 2;
@@ -28,6 +30,8 @@ function gameLoop(){
     playerLayerReceived = false;
     if(!objectLayerReceived)
     {
+      missedObjectPackets++;
+      console.log(missedObjectPackets + " object packets missed");
       for(var i = 0; i < layerObjects.length; i++)
       {
         if(layerObjects[i].xVel != 0){layerObjects[i].xVel*=0.999;}                                            
@@ -42,12 +46,14 @@ function gameLoop(){
     objectLayerReceived = false;
     if(!viewLayerReceived)
     {
+      missedViewPackets++;
+      console.log(missedViewPackets + " view packets missed");
       view.ticks++;
     }
     viewLayerReceived = false;
     view.drawPlayer(playArea.playerContext, player);                                                  //draw player(s) and player projectiles based on most current player information
     var m = 1;
-    if(serverAccept2)
+    if(twoPlayerGame)
     {
       view.drawPlayer(playArea.player2Context, player2);
       m = 2;
@@ -86,7 +92,5 @@ function gameLoop(){
     }
     view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);                       //clear and update UI
     view.updateUI();
-    playerLayerReceived = false;
-    objectLayerReceived = false;
   }
 }
