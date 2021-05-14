@@ -10,6 +10,7 @@
     <script type="text/javascript" src="/client/js/model.js"></script>
     <script type="text/javascript" src="/client/js/playArea.js"></script>
     <script type="text/javascript" src="/client/js/view.js"></script>
+    <!--<script type="text/javascript" src="/client/js/fullLoop.js"></script>-->
     <script>
       var socket = io();                                                                //TODO adjustable resolution based on client and window size    
       var numCanvases = 16;                                                             //change current static size of 1024x768 to smallest base resolution.
@@ -36,10 +37,12 @@
       var missedPlayerPackets = 0;  
       var missedObjectPackets = 0;
       var missedViewPackets = 0;                                
-
+      var serverTick = 0;
+      var clientTick = 0;
+      var clientGame = null;
   socket.on("gameStarted", function(){                                                                  //Start game loop on client when signal received from server that the game is
     onePlayerGame = true;                                                                                //running on the server
-    initGame();
+    //initGame();
   });
 
   socket.on("twoPlayerSessionStarted", function(){                                                      //acknowledges that a 2-player session has started on the server and puts
@@ -55,7 +58,7 @@
     twoPlayerGame = true;
     displayMessage("");
     document.getElementById("Message").style.display = "none";                                                                               //session.  Beings game loop on client.
-    initGame();
+    //initGame();
   });
 
   socket.on("serverFull", function(){                                                                   //Server capacity is preliminarily set at 10 sockets.  This signal lets the client know
@@ -71,6 +74,37 @@
   socket.on("sessionAbandoned", function(){                                                          //signal to client if the player in a 2-player session that is not hosting has disconnected mid-game                                                                            //puts the client in an end game state, and enables the client to start a new game
     gamePaused = true;
     view.displayPauseScreen();
+  });
+
+  socket.on('dataLayer', function(data){
+
+    if(clientTick == 0)
+    {
+      initGame();
+    }
+    if(data)
+    {
+      playerObjects = data.playerObjects;
+      player = data.playerObjects[0];
+      if(twoPlayerGame){player2 = data.playerObjects[1];}
+      playerLayerReceived = true;
+
+      layerObjects = data.layerObjects;
+      objectLayerRecieved = true;
+
+      view.playerScore = data.viewObjects.playerScore;
+      view.multiplier = data.viewObjects.multiplier;
+      patientHealth = data.viewObjects.patientHealth;
+      serverTick = data,viewObjects.tick;
+      view.tick = serverTick;
+      viewLayerReceived = true;
+    }
+    else
+    {
+      playerLayerReceived = false;
+      objectLayerReceived = false;
+      viewLayerReceived = false;
+    }
   });
 
   socket.on('playerLayer', function(data){                                                            //controls what the client does when a playerLayer package has arrived from the server
@@ -99,7 +133,8 @@
       view.playerScore = data.playerScore;                                                            //updates view layer variables with new information from the server
       view.multiplier = data.multiplier;
       patientHealth = data.patientHealth;
-      view.ticks = data.tick;
+      serverTick = data.tick;
+      view.tick = serverTick;
       viewLayerReceived = true;
     }
     else{console.log("no view layer data in package");}
@@ -166,6 +201,7 @@
         view.makeUILayer();                                                                                 //change listeners for mouse input from menu to gameplay
         document.getElementById("gameDiv").style.cursor = "none";                                            //no visible cursor
         addGameListeners();
+        //
         myInterval = setInterval(gameLoop, intervalTime)
                                                                                                             //TODO organize socket related functions with socket calls
       }

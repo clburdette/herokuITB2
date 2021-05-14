@@ -1,6 +1,7 @@
 function gameLoop(){
   if(!gamePaused)
-  {                                                                                               //which recursively called a client function.  Needed to abandon that so that I could move the game 
+  {  
+    clientTick++                                                                                             //which recursively called a client function.  Needed to abandon that so that I could move the game 
     if(!mouseDownCheck)                                                                           //loop to the server to facilitate multiplayer games
     { pressedKeys["m"] = false; }                                                                 //mouse check constrains mouse clicks to the update loop, allowing no more than one projectile
     socket.emit('playerInput', pressedKeys);                                                      //fired per frame
@@ -48,7 +49,7 @@ function gameLoop(){
     {
       missedViewPackets++;
       console.log(missedViewPackets + " view packets missed");
-      view.ticks++;
+      serverTick++;
     }
     viewLayerReceived = false;
     view.drawPlayer(playArea.playerContext, player);                                                  //draw player(s) and player projectiles based on most current player information
@@ -92,5 +93,6 @@ function gameLoop(){
     }
     view.uiContext.clearRect(0,0,view.uiCanvas.width,view.uiCanvas.height);                       //clear and update UI
     view.updateUI();
+    socket.emit("tick", clientTick);
   }
 }
